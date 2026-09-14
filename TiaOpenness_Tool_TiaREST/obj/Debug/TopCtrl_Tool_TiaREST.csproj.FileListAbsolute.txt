@@ -1,0 +1,12 @@
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\obj\Debug\TiaOpenness_Tool_TiaREST.csproj.AssemblyReference.cache
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\obj\Debug\TiaOpenness_Tool_TiaREST.csproj.CoreCompileInputs.cache
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\bin\Debug\TiaOpenness_Tool_TiaREST.exe.config
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\bin\Debug\TiaOpenness_Tool_TiaREST.exe
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\bin\Debug\TiaOpenness_Tool_TiaREST.pdb
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\bin\Debug\Newtonsoft.Json.dll
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\bin\Debug\TiaOpenness_Tool_Shared.dll
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\bin\Debug\TiaOpenness_Tool_Shared.pdb
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\bin\Debug\Newtonsoft.Json.xml
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\obj\Debug\TiaOpenness_.22D4D93C.Up2Date
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\obj\Debug\TiaOpenness_Tool_TiaREST.exe
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_TiaREST\obj\Debug\TiaOpenness_Tool_TiaREST.pdb

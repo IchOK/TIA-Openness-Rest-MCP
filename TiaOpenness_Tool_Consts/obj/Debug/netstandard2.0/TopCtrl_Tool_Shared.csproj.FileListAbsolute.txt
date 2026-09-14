@@ -1,0 +1,11 @@
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\bin\Debug\netstandard2.0\TiaOpenness_Tool_Shared.deps.json
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\bin\Debug\netstandard2.0\TiaOpenness_Tool_Shared.dll
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\bin\Debug\netstandard2.0\TiaOpenness_Tool_Shared.pdb
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\obj\Debug\netstandard2.0\TiaOpenness_Tool_Shared.csproj.AssemblyReference.cache
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\obj\Debug\netstandard2.0\TiaOpenness_Tool_Shared.GeneratedMSBuildEditorConfig.editorconfig
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\obj\Debug\netstandard2.0\TiaOpenness_Tool_Shared.AssemblyInfoInputs.cache
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\obj\Debug\netstandard2.0\TiaOpenness_Tool_Shared.AssemblyInfo.cs
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\obj\Debug\netstandard2.0\TiaOpenness_Tool_Shared.csproj.CoreCompileInputs.cache
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\obj\Debug\netstandard2.0\TiaOpenness_Tool_Shared.sourcelink.json
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\obj\Debug\netstandard2.0\TiaOpenness_Tool_Shared.dll
+C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\obj\Debug\netstandard2.0\TiaOpenness_Tool_Shared.pdb

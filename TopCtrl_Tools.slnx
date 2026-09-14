@@ -1,8 +1,0 @@
-<Solution>
-  <Folder Name="/Solution Items/">
-    <File Path=".editorconfig" />
-  </Folder>
-  <Project Path="TopCtrl_Tool_Consts/TopCtrl_Tool_Shared.csproj" Id="69b2b44b-2011-4200-93b5-003783fd1650" />
-  <Project Path="TopCtrl_Tool_TiaMCP/TopCtrl_Tool_TiaMCP.csproj" />
-  <Project Path="TopCtrl_Tool_TiaREST/TopCtrl_Tool_TiaREST.csproj" Id="b419e7bc-1d13-45fd-ba58-c7eebd0584b9" />
-</Solution>

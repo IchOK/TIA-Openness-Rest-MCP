@@ -1,0 +1,8 @@
+is_global = true
+build_property.RootNamespace = TiaOpenness_Tool_Shared
+build_property.ProjectDir = C:\DATA\TIA-Openness-Rest-MCP\TiaOpenness_Tool_Consts\
+build_property.EnableComHosting = 
+build_property.EnableGeneratedComInterfaceComImportInterop = 
+build_property.CsWinRTUseWindowsUIXamlProjections = false
+build_property.EffectiveAnalysisLevelStyle = 
+build_property.EnableCodeStyleSeverity = 
