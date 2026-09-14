@@ -1,0 +1,48 @@
+# ==========================================
+# 1. Visual Studio / IDE Caches & User Files
+# ==========================================
+.vs/
+*.user
+*.userosv
+*.suo
+*.userprefs
+*.sln.docstates
+*.vstw
+*.DotSettings.user
+
+# ==========================================
+# 2. Build-Outputs & Kompilate
+# ==========================================
+*.pdb
+*.i
+*.obj
+
+# ==========================================
+# 3. Test-Ergebnisse & Abdeckung
+# ==========================================
+[Tt]est[Rr]esults/
+*.coverage
+*.coveragexml
+
+# ==========================================
+# 4. NuGet-Pakete & Restores
+# ==========================================
+*.nupkg
+packages/
+!packages/repository.config
+
+# ==========================================
+# 5. Temporäre Dateien, Logs & OS-Dateien
+# ==========================================
+*.log
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# 6. TIA Portal / Openness Temporäre Dateien
+# ==========================================
+# Falls du TIA-Archive oder Export-Dateien im Projektordner hast:
+export/
