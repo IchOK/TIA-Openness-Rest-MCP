@@ -88,11 +88,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaProject.List(context);
           }
           
-          // Routen für Datenbausteine
-          else if (path == DBRoutes.List) {
-            responseString = cTiaDBs.List(context);
-          } else if (path == DBRoutes.Get) {
-            responseString = cTiaDBs.Get(context);
+          // Routen für Bausteine (DB, FB, FC, OB, …)
+          else if (path == BlockRoutes.List) {
+            responseString = cTiaBlocks.GetAll(context);
+          } else if (path == BlockRoutes.Get) {
+            responseString = cTiaBlocks.Get(context);
           }
 
           // Routen für Datentypen
@@ -100,27 +100,6 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaUDTs.List(context);
           } else if (path == UDTRoutes.Get) {
             responseString = cTiaUDTs.Get(context);
-          }
-
-          // Routen für Funktionen (FC)
-          else if (path == FCRoutes.List) {
-            responseString = cTiaFCs.List(context);
-          } else if (path == FCRoutes.Get) {
-            responseString = cTiaFCs.Get(context);
-          }
-
-          // Routen für Funktionsbausteine (FB)
-          else if (path == FBRoutes.List) {
-            responseString = cTiaFBs.List(context);
-          } else if (path == FBRoutes.Get) {
-            responseString = cTiaFBs.Get(context);
-          }
-
-          // Routen für Organisationsbausteine (OB)
-          else if (path == OBRoutes.List) {
-            responseString = cTiaOBs.List(context);
-          } else if (path == OBRoutes.Get) {
-            responseString = cTiaOBs.Get(context);
           }
 
           // Routen für Variablentabellen

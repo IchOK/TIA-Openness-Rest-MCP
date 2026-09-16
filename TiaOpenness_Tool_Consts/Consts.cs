@@ -28,12 +28,11 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   }
 
   /// <summary>
-  /// Konstanten für die DB-Routen.
+  /// Konstanten für die Block-Routen (DB, FB, FC, OB, …).
   /// </summary>
-  public static class DBRoutes
-  {
-    public const string List = "/api/dbs";
-    public const string Get = "/api/dbs/get";
+  public static class BlockRoutes {
+    public const string List = "/api/blocks";
+    public const string Get = "/api/blocks/get";
   }
 
   /// <summary>
@@ -42,30 +41,6 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   public static class UDTRoutes {
     public const string List = "/api/udts";
     public const string Get = "/api/udts/get";
-  }
-
-  /// <summary>
-  /// Konstanten für die FC-Routen.
-  /// </summary>
-  public static class FCRoutes {
-    public const string List = "/api/fcs";
-    public const string Get = "/api/fcs/get";
-  }
-
-  /// <summary>
-  /// Konstanten für die FB-Routen.
-  /// </summary>
-  public static class FBRoutes {
-    public const string List = "/api/fbs";
-    public const string Get = "/api/fbs/get";
-  }
-
-  /// <summary>
-  /// Konstanten für die OB-Routen.
-  /// </summary>
-  public static class OBRoutes {
-    public const string List = "/api/obs";
-    public const string Get = "/api/obs/get";
   }
 
   /// <summary>

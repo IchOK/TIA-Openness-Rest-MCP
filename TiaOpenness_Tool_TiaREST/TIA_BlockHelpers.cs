@@ -4,6 +4,7 @@ using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Types;
 using System;
 using System.IO;
+using Tophinke.TiaOpenness.Tool.Types.Block;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
   /// <summary>

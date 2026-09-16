@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Tophinke.TiaOpenness.Tool.Types.DB {
+namespace Tophinke.TiaOpenness.Tool.Types.Block {
   public class Info {
     // Eindeutige Hardware-Kennungen
     public string DeviceName { get; set; }     // z. B. "PLC_1" (Ebene 1: Device)
@@ -13,6 +13,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.DB {
     public string BlockName { get; set; }      // z. B. "MotorData"
     public int BlockNumber { get; set; }       // z. B. 10
     public string BlockType { get; set; }      // z. B. "GlobalDB"
+    public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
   }
 
   public class  Data {

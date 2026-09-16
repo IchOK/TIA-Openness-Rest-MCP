@@ -1,18 +1,20 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
-using Tophinke.TiaOpenness.Tool.Types.FB;
+using Tophinke.TiaOpenness.Tool.Types.Block;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
-  static internal class cTiaFBs {
-    static public string List(HttpListenerContext context) {
+  static internal class cTiaBlocks {
+    static public string GetAll(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
+      string[] filterTypes = context.Request.QueryString["filterTypes"]?.Split(',');
 
       try {
         var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
@@ -21,7 +23,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             foreach (DeviceItem deviceItem in device.DeviceItems) {
               SoftwareContainer container = deviceItem.GetService<SoftwareContainer>();
               if (container != null && container.Software is PlcSoftware plcSoftware) {
-                List(plcSoftware.BlockGroup, list, device.Name, deviceItem.Name, plcSoftware.Name);
+                list.AddRange(GetAll(plcSoftware.BlockGroup, device.Name, deviceItem.Name, plcSoftware.Name, filterTypes));
               }
             }
           }
@@ -61,8 +63,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           }
 
           PlcBlock block = cTiaBlockHelpers.FindBlock(plcBlockGroup, blockName);
-          if (block == null || !(block is FB)) {
-            errorMessage = $"Error: FB with name {blockName} not found in PLC software {plcSoftware.Name}.";
+          if (block == null) {
+            errorMessage = $"Error: Block with name {blockName} not found in PLC software {plcSoftware.Name}.";
             Console.Error.WriteLine(errorMessage);
             context.Response.StatusCode = (int)HttpStatusCode.NotFound;
             context.Response.ContentType = "text/plain";
@@ -105,22 +107,37 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
-    static private void List(PlcBlockGroup group, List<Info> list, string deviceName, string deviceItemName, string plcName) {
-      foreach (PlcBlock block in group.Blocks) {
-        if (block is FB) {
-          list.Add(new Info {
-            DeviceName = deviceName,
-            DeviceItemName = deviceItemName,
-            PlcName = plcName,
-            BlockName = block.Name,
-            BlockNumber = block.Number,
-            BlockType = block.GetType().Name
-          });
+    #region Hilfsmethoden für TIA Openness Objektstruktur
+
+    /// <summary>
+    /// Durchsucht die Ordnerstruktur eines PLC-Block-Groups rekursiv nach Bausteinen und fügt die gefundenen Informationen in eine Liste ein.
+    /// </summary>
+    static public List<Info> GetAll(PlcBlockGroup group, string deviceName, string deviceItemName, string plcName, string[] filterTypes = null, string[] path = null) {
+      var blocks = new List<Info>();
+      if (path == null) {
+        path = new string[] { };
+      }
+      foreach (var block in group.Blocks) {
+        if (filterTypes != null && !filterTypes.Contains(block.GetType().Name)) {
+          continue;
         }
+        blocks.Add(new Info {
+          DeviceName = deviceName,
+          DeviceItemName = deviceItemName,
+          PlcName = plcName,
+          BlockName = block.Name,
+          BlockNumber = block.Number,
+          BlockType = block.GetType().Name,
+          Path = path
+        });
       }
-      foreach (PlcBlockUserGroup userGroup in group.Groups) {
-        List(userGroup, list, deviceName, deviceItemName, plcName);
+      foreach (var userGroup in group.Groups) {
+        string[] newPath = path.Concat(new string[] { userGroup.Name }).ToArray();
+        blocks.AddRange(GetAll(userGroup, deviceName, deviceItemName, plcName, filterTypes, newPath));
       }
+      return blocks;
     }
+
+    #endregion
   }
 }

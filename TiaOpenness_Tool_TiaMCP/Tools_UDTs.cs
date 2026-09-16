@@ -8,7 +8,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaMCP;
 
 [McpServerToolType]
 public class UDTTools {
-  [McpServerTool, Description("Returns a list of all data blocks (DBs) of a specific TIA project.")]
+  [McpServerTool, Description(
+    "Returns a list of all PLC user-defined types (UDTs) of a specific TIA project. " +
+    "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
+    "On success, Data is a JSON array of objects with: " +
+    "DeviceName (device / station name, required for GetUdt), " +
+    "DeviceItemName (CPU / device item name, required for GetUdt), " +
+    "PlcName (PLC software name), " +
+    "UdtName (UDT name, required for GetUdt).")]
   public static async Task<McpApiResponse> ListUdts(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName) {
@@ -39,7 +46,17 @@ public class UDTTools {
     }
   }
 
-  [McpServerTool, Description("Returns the Structure of a UDT")]
+  [McpServerTool, Description(
+    "Returns the structure/content of a PLC user-defined type (UDT). " +
+    "Use DeviceName, DeviceItemName and UdtName from ListUdts. " +
+    "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
+    "On success, Data is a JSON object with: " +
+    "DeviceName (device / station name), " +
+    "DeviceItemName (CPU / device item name), " +
+    "PlcName (PLC software name), " +
+    "UdtName (UDT name), " +
+    "Format (export format; typically \"SimaticData/SD\"), " +
+    "Content (full UDT text in SIMATIC SD / .s7dcl form: type declaration and members).")]
   public static async Task<McpApiResponse> GetUdt(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,

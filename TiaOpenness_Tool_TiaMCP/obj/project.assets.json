@@ -177,7 +177,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\TopAdmin\\.nuget\\packages\\": {},
+    "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\7d712158e4bccf67fde48e7415a3b674\\nuget": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -186,7 +186,7 @@
       "projectUniqueName": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_TiaMCP\\TiaOpenness_Tool_TiaMCP.csproj",
       "projectName": "TiaOpenness_Tool_TiaMCP",
       "projectPath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_TiaMCP\\TiaOpenness_Tool_TiaMCP.csproj",
-      "packagesPath": "C:\\Users\\TopAdmin\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\7d712158e4bccf67fde48e7415a3b674\\nuget",
       "outputPath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_TiaMCP\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
