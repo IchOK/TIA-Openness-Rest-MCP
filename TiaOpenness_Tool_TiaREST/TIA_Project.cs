@@ -4,6 +4,7 @@ using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Types;
 using System;
 using System.Collections;
@@ -258,6 +259,44 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         if (container != null && container.Software is PlcSoftware) {
           plcSoftware = (PlcSoftware)container.Software;
           plcTypeGroup = plcSoftware.TypeGroup;
+          return null;
+        } else {
+          return $"Error: No PLC software found in device {deviceName}/item {deviceItemName} within project {project.Name}.";
+        }
+      }
+    }
+
+    static public string GetPlcTagTableGroup(Project project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup) {
+      plcTagTableGroup = null;
+      plcSoftware = null;
+      if (project == null) {
+        return "Error: Project must be provided.";
+      }
+      if (string.IsNullOrEmpty(deviceName) || string.IsNullOrEmpty(deviceItemName)) {
+        foreach (Device device in project.Devices) {
+          foreach (DeviceItem deviceItem in device.DeviceItems) {
+            SoftwareContainer container = deviceItem.GetService<SoftwareContainer>();
+            if (container != null && container.Software is PlcSoftware) {
+              plcSoftware = (PlcSoftware)container.Software;
+              plcTagTableGroup = plcSoftware.TagTableGroup;
+              return null;
+            }
+          }
+        }
+        return "Error: No PLC software found.";
+      } else {
+        var device = project.Devices.FirstOrDefault(d => d.Name == deviceName);
+        if (device == null) {
+          return $"Error: Device with name {deviceName} not found in project {project.Name}.";
+        }
+        var deviceItem = device.DeviceItems.FirstOrDefault(di => di.Name == deviceItemName);
+        if (deviceItem == null) {
+          return $"Error: Device item with name {deviceItemName} not found in device {deviceName}.";
+        }
+        SoftwareContainer container = deviceItem.GetService<SoftwareContainer>();
+        if (container != null && container.Software is PlcSoftware) {
+          plcSoftware = (PlcSoftware)container.Software;
+          plcTagTableGroup = plcSoftware.TagTableGroup;
           return null;
         } else {
           return $"Error: No PLC software found in device {deviceName}/item {deviceItemName} within project {project.Name}.";

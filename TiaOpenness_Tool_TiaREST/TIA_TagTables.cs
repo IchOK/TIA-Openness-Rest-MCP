@@ -1,22 +1,15 @@
-﻿using Newtonsoft.Json;
-using Siemens.Engineering;
+using Newtonsoft.Json;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
-using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Tags;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using Tophinke.TiaOpenness.Tool.Types.DB;
+using Tophinke.TiaOpenness.Tool.Types.TagTable;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
-  static internal class cTiaDBs {
+  static internal class cTiaTagTables {
     static public string List(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -28,7 +21,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             foreach (DeviceItem deviceItem in device.DeviceItems) {
               SoftwareContainer container = deviceItem.GetService<SoftwareContainer>();
               if (container != null && container.Software is PlcSoftware plcSoftware) {
-                List(plcSoftware.BlockGroup, list, device.Name, deviceItem.Name, plcSoftware.Name);
+                List(plcSoftware.TagTableGroup, list, device.Name, deviceItem.Name, plcSoftware.Name);
               }
             }
           }
@@ -53,13 +46,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     static public string Get(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
-      string blockName = context.Request.QueryString["blockName"];
+      string tagTableName = context.Request.QueryString["tagTableName"];
       string deviceName = context.Request.QueryString["deviceName"];
       string deviceItemName = context.Request.QueryString["deviceItemName"];
 
       try {
         var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
-          var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
+          var errorMessage = cTiaProject.GetPlcTagTableGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup);
           if (errorMessage != null) {
             Console.Error.WriteLine(errorMessage);
             context.Response.StatusCode = (int)HttpStatusCode.NotFound;
@@ -67,32 +60,51 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             return errorMessage;
           }
 
-          PlcBlock block = cTiaBlockHelpers.FindBlock(plcBlockGroup, blockName);
-          if (block == null || !(block is GlobalDB || block is InstanceDB || block is ArrayDB)) {
-            errorMessage = $"Error: DB with name {blockName} not found in PLC software {plcSoftware.Name}.";
+          PlcTagTable tagTable = cTiaBlockHelpers.FindTagTable(plcTagTableGroup, tagTableName);
+          if (tagTable == null) {
+            errorMessage = $"Error: Tag table with name {tagTableName} not found in PLC software {plcSoftware.Name}.";
             Console.Error.WriteLine(errorMessage);
             context.Response.StatusCode = (int)HttpStatusCode.NotFound;
             context.Response.ContentType = "text/plain";
             return errorMessage;
           }
 
-          errorMessage = cTiaBlockHelpers.ExportBlockAsDocuments(block, blockName, out string fileContent);
-          if (errorMessage != null) {
-            Console.Error.WriteLine(errorMessage);
-            context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-            context.Response.ContentType = "text/plain";
-            return errorMessage;
+          var tags = new List<TagInfo>();
+          foreach (PlcTag tag in tagTable.Tags) {
+            tags.Add(new TagInfo {
+              Name = tag.Name,
+              DataTypeName = tag.DataTypeName,
+              LogicalAddress = tag.LogicalAddress
+            });
+          }
+
+          var userConstants = new List<ConstantInfo>();
+          foreach (PlcUserConstant constant in tagTable.UserConstants) {
+            userConstants.Add(new ConstantInfo {
+              Name = constant.Name,
+              DataTypeName = constant.DataTypeName,
+              Value = constant.Value
+            });
+          }
+
+          var systemConstants = new List<ConstantInfo>();
+          foreach (PlcSystemConstant constant in tagTable.SystemConstants) {
+            systemConstants.Add(new ConstantInfo {
+              Name = constant.Name,
+              DataTypeName = constant.DataTypeName,
+              Value = constant.Value
+            });
           }
 
           var data = new Data {
             DeviceName = deviceName,
             DeviceItemName = deviceItemName,
             PlcName = plcSoftware.Name,
-            BlockName = block.Name,
-            BlockNumber = block.Number,
-            BlockType = block.GetType().Name,
-            Format = "SimaticData/SD",
-            Content = fileContent
+            TagTableName = tagTable.Name,
+            IsDefault = tagTable.IsDefault,
+            Tags = tags,
+            UserConstants = userConstants,
+            SystemConstants = systemConstants
           };
 
           context.Response.ContentType = "application/json";
@@ -112,38 +124,19 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
-    #region Hilfsmethoden für TIA Openness Objektstruktur
-
-    /// <summary>
-    /// Durchsucht die Ordnerstruktur eines PLC-Block-Groups rekursiv nach Datenbausteinen (DBs) und fügt die gefundenen Informationen in eine Liste ein.
-    /// </summary>
-    /// <param name="group">aktuell zu durchsuchender Block-Group</param>
-    /// <param name="list">Liste, in die die gefundenen Informationen hinzugefügt werden</param>
-    /// <param name="deviceName">Name des Geräts</param>
-    /// <param name="deviceItemName">Name des Gerätelements</param>
-    /// <param name="plcName">Name des PLCs</param>
-    static private void List(PlcBlockGroup group, List<Info> list, string deviceName, string deviceItemName, string plcName) {
-      foreach (PlcBlock block in group.Blocks) {
-        // In Openness sind DBs spezifische Klassen
-        if (block is GlobalDB || block is InstanceDB || block is ArrayDB) {
-          list.Add(new Info {
-            DeviceName = deviceName,
-            DeviceItemName = deviceItemName,
-            PlcName = plcName,
-            BlockName = block.Name,
-            BlockNumber = block.Number,
-            BlockType = block.GetType().Name
-          });
-
-        }
+    static private void List(PlcTagTableGroup group, List<Info> list, string deviceName, string deviceItemName, string plcName) {
+      foreach (PlcTagTable table in group.TagTables) {
+        list.Add(new Info {
+          DeviceName = deviceName,
+          DeviceItemName = deviceItemName,
+          PlcName = plcName,
+          TagTableName = table.Name,
+          IsDefault = table.IsDefault
+        });
       }
-
-      // Rekursiv in Unterordnern suchen
-      foreach (PlcBlockUserGroup userGroup in group.Groups) {
+      foreach (PlcTagTableUserGroup userGroup in group.Groups) {
         List(userGroup, list, deviceName, deviceItemName, plcName);
       }
     }
-
-    #endregion
   }
 }

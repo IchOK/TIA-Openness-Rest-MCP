@@ -1,22 +1,15 @@
-﻿using Newtonsoft.Json;
-using Siemens.Engineering;
+using Newtonsoft.Json;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
-using Tophinke.TiaOpenness.Tool.Types.DB;
+using Tophinke.TiaOpenness.Tool.Types.OB;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
-  static internal class cTiaDBs {
+  static internal class cTiaOBs {
     static public string List(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -68,8 +61,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           }
 
           PlcBlock block = cTiaBlockHelpers.FindBlock(plcBlockGroup, blockName);
-          if (block == null || !(block is GlobalDB || block is InstanceDB || block is ArrayDB)) {
-            errorMessage = $"Error: DB with name {blockName} not found in PLC software {plcSoftware.Name}.";
+          if (block == null || !(block is OB)) {
+            errorMessage = $"Error: OB with name {blockName} not found in PLC software {plcSoftware.Name}.";
             Console.Error.WriteLine(errorMessage);
             context.Response.StatusCode = (int)HttpStatusCode.NotFound;
             context.Response.ContentType = "text/plain";
@@ -112,20 +105,9 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
-    #region Hilfsmethoden für TIA Openness Objektstruktur
-
-    /// <summary>
-    /// Durchsucht die Ordnerstruktur eines PLC-Block-Groups rekursiv nach Datenbausteinen (DBs) und fügt die gefundenen Informationen in eine Liste ein.
-    /// </summary>
-    /// <param name="group">aktuell zu durchsuchender Block-Group</param>
-    /// <param name="list">Liste, in die die gefundenen Informationen hinzugefügt werden</param>
-    /// <param name="deviceName">Name des Geräts</param>
-    /// <param name="deviceItemName">Name des Gerätelements</param>
-    /// <param name="plcName">Name des PLCs</param>
     static private void List(PlcBlockGroup group, List<Info> list, string deviceName, string deviceItemName, string plcName) {
       foreach (PlcBlock block in group.Blocks) {
-        // In Openness sind DBs spezifische Klassen
-        if (block is GlobalDB || block is InstanceDB || block is ArrayDB) {
+        if (block is OB) {
           list.Add(new Info {
             DeviceName = deviceName,
             DeviceItemName = deviceItemName,
@@ -134,16 +116,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             BlockNumber = block.Number,
             BlockType = block.GetType().Name
           });
-
         }
       }
-
-      // Rekursiv in Unterordnern suchen
       foreach (PlcBlockUserGroup userGroup in group.Groups) {
         List(userGroup, list, deviceName, deviceItemName, plcName);
       }
     }
-
-    #endregion
   }
 }

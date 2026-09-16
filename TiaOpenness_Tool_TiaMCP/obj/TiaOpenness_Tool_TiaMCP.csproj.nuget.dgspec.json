@@ -10,16 +10,22 @@
         "projectUniqueName": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_Consts\\TiaOpenness_Tool_Shared.csproj",
         "projectName": "TiaOpenness_Tool_Shared",
         "projectPath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_Consts\\TiaOpenness_Tool_Shared.csproj",
-        "packagesPath": "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\3189999229bf0848cda4afcc5b99cdee\\nuget",
+        "packagesPath": "C:\\Users\\TopAdmin\\.nuget\\packages\\",
         "outputPath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_Consts\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "C:\\Users\\TopAdmin\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\TopAdmin\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "netstandard2.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -74,16 +80,22 @@
         "projectUniqueName": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_TiaMCP\\TiaOpenness_Tool_TiaMCP.csproj",
         "projectName": "TiaOpenness_Tool_TiaMCP",
         "projectPath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_TiaMCP\\TiaOpenness_Tool_TiaMCP.csproj",
-        "packagesPath": "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\3189999229bf0848cda4afcc5b99cdee\\nuget",
+        "packagesPath": "C:\\Users\\TopAdmin\\.nuget\\packages\\",
         "outputPath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_TiaMCP\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "C:\\Users\\TopAdmin\\AppData\\Roaming\\NuGet\\NuGet.Config"
+          "C:\\Users\\TopAdmin\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
           "net10.0"
         ],
         "sources": {
+          "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {

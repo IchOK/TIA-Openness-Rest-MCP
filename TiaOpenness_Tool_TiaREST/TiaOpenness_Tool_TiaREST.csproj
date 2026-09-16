@@ -52,8 +52,14 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TIA_BlockHelpers.cs" />
     <Compile Include="TIA_UDTs.cs" />
     <Compile Include="TIA_DBs.cs" />
+    <Compile Include="TIA_FCs.cs" />
+    <Compile Include="TIA_FBs.cs" />
+    <Compile Include="TIA_OBs.cs" />
+    <Compile Include="TIA_TagTables.cs" />
+    <Compile Include="TIA_XRefs.cs" />
     <Compile Include="TIA_Project.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "TiaOpenness": {
+      "url": "http://localhost:6281/mcp",
+      "headers": {
+        "X-API-Key": "TiaOpennessDefaultToken"
+      }
+    }
+  }
+}

@@ -43,4 +43,43 @@ namespace Tophinke.TiaOpenness.Tool.Consts
     public const string List = "/api/udts";
     public const string Get = "/api/udts/get";
   }
+
+  /// <summary>
+  /// Konstanten für die FC-Routen.
+  /// </summary>
+  public static class FCRoutes {
+    public const string List = "/api/fcs";
+    public const string Get = "/api/fcs/get";
+  }
+
+  /// <summary>
+  /// Konstanten für die FB-Routen.
+  /// </summary>
+  public static class FBRoutes {
+    public const string List = "/api/fbs";
+    public const string Get = "/api/fbs/get";
+  }
+
+  /// <summary>
+  /// Konstanten für die OB-Routen.
+  /// </summary>
+  public static class OBRoutes {
+    public const string List = "/api/obs";
+    public const string Get = "/api/obs/get";
+  }
+
+  /// <summary>
+  /// Konstanten für die Querverweis-Routen.
+  /// </summary>
+  public static class XRefRoutes {
+    public const string Get = "/api/xrefs";
+  }
+
+  /// <summary>
+  /// Konstanten für die Variablentabellen-Routen.
+  /// </summary>
+  public static class TagTableRoutes {
+    public const string List = "/api/tagtables";
+    public const string Get = "/api/tagtables/get";
+  }
 }

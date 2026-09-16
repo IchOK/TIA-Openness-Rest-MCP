@@ -102,6 +102,39 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaUDTs.Get(context);
           }
 
+          // Routen für Funktionen (FC)
+          else if (path == FCRoutes.List) {
+            responseString = cTiaFCs.List(context);
+          } else if (path == FCRoutes.Get) {
+            responseString = cTiaFCs.Get(context);
+          }
+
+          // Routen für Funktionsbausteine (FB)
+          else if (path == FBRoutes.List) {
+            responseString = cTiaFBs.List(context);
+          } else if (path == FBRoutes.Get) {
+            responseString = cTiaFBs.Get(context);
+          }
+
+          // Routen für Organisationsbausteine (OB)
+          else if (path == OBRoutes.List) {
+            responseString = cTiaOBs.List(context);
+          } else if (path == OBRoutes.Get) {
+            responseString = cTiaOBs.Get(context);
+          }
+
+          // Routen für Variablentabellen
+          else if (path == TagTableRoutes.List) {
+            responseString = cTiaTagTables.List(context);
+          } else if (path == TagTableRoutes.Get) {
+            responseString = cTiaTagTables.Get(context);
+          }
+
+          // Routen für Querverweise
+          else if (path == XRefRoutes.Get) {
+            responseString = cTiaXRefs.Get(context);
+          }
+
           // Route nicht gefunden
           else {
             context.Response.StatusCode = (int)HttpStatusCode.NotFound;

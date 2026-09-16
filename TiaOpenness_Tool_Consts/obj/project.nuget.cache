@@ -1,11 +1,11 @@
 {
   "version": 2,
-  "dgSpecHash": "4jdGQ/1H/mY=",
+  "dgSpecHash": "d/VpcdJR7T0=",
   "success": true,
   "projectFilePath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_Consts\\TiaOpenness_Tool_Shared.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\3189999229bf0848cda4afcc5b99cdee\\nuget\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
-    "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\3189999229bf0848cda4afcc5b99cdee\\nuget\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
+    "C:\\Users\\TopAdmin\\.nuget\\packages\\microsoft.netcore.platforms\\1.1.0\\microsoft.netcore.platforms.1.1.0.nupkg.sha512",
+    "C:\\Users\\TopAdmin\\.nuget\\packages\\netstandard.library\\2.0.3\\netstandard.library.2.0.3.nupkg.sha512"
   ],
   "logs": []
 }

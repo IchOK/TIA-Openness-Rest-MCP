@@ -1,0 +1,62 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "rebuild-shared",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/TiaOpenness_Tool_Consts/TiaOpenness_Tool_Shared.csproj",
+        "-c",
+        "Debug",
+        "--no-incremental"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "rebuild-rest",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "msbuild",
+        "${workspaceFolder}/TiaOpenness_Tool_TiaREST/TiaOpenness_Tool_TiaREST.csproj",
+        "/p:Configuration=Debug",
+        "/t:Rebuild",
+        "/v:m"
+      ],
+      "dependsOn": ["rebuild-shared"],
+      "dependsOrder": "sequence",
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "rebuild-mcp",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/TiaOpenness_Tool_TiaMCP/TiaOpenness_Tool_TiaMCP.csproj",
+        "-c",
+        "Debug",
+        "--no-incremental"
+      ],
+      "dependsOn": ["rebuild-shared"],
+      "dependsOrder": "sequence",
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "rebuild-all",
+      "dependsOrder": "sequence",
+      "dependsOn": ["rebuild-rest", "rebuild-mcp"],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "detail": "Baut Shared, TiaREST und TiaMCP neu (Debug)"
+    }
+  ]
+}

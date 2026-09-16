@@ -1,13 +1,13 @@
 {
   "version": 2,
-  "dgSpecHash": "P1+wY6/Vz/A=",
+  "dgSpecHash": "1xwi0Klzs/g=",
   "success": true,
   "projectFilePath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_TiaMCP\\TiaOpenness_Tool_TiaMCP.csproj",
   "expectedPackageFiles": [
-    "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\3189999229bf0848cda4afcc5b99cdee\\nuget\\microsoft.extensions.ai.abstractions\\10.8.3\\microsoft.extensions.ai.abstractions.10.8.3.nupkg.sha512",
-    "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\3189999229bf0848cda4afcc5b99cdee\\nuget\\modelcontextprotocol\\2.2.0\\modelcontextprotocol.2.2.0.nupkg.sha512",
-    "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\3189999229bf0848cda4afcc5b99cdee\\nuget\\modelcontextprotocol.aspnetcore\\2.2.0\\modelcontextprotocol.aspnetcore.2.2.0.nupkg.sha512",
-    "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\3189999229bf0848cda4afcc5b99cdee\\nuget\\modelcontextprotocol.core\\2.2.0\\modelcontextprotocol.core.2.2.0.nupkg.sha512"
+    "C:\\Users\\TopAdmin\\.nuget\\packages\\microsoft.extensions.ai.abstractions\\10.8.3\\microsoft.extensions.ai.abstractions.10.8.3.nupkg.sha512",
+    "C:\\Users\\TopAdmin\\.nuget\\packages\\modelcontextprotocol\\2.2.0\\modelcontextprotocol.2.2.0.nupkg.sha512",
+    "C:\\Users\\TopAdmin\\.nuget\\packages\\modelcontextprotocol.aspnetcore\\2.2.0\\modelcontextprotocol.aspnetcore.2.2.0.nupkg.sha512",
+    "C:\\Users\\TopAdmin\\.nuget\\packages\\modelcontextprotocol.core\\2.2.0\\modelcontextprotocol.core.2.2.0.nupkg.sha512"
   ],
   "logs": []
 }
