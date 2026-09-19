@@ -10,7 +10,7 @@
         "projectUniqueName": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_Consts\\TiaOpenness_Tool_Shared.csproj",
         "projectName": "TiaOpenness_Tool_Shared",
         "projectPath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_Consts\\TiaOpenness_Tool_Shared.csproj",
-        "packagesPath": "C:\\Users\\TopAdmin\\AppData\\Local\\Temp\\cursor-sandbox-cache\\7d712158e4bccf67fde48e7415a3b674\\nuget",
+        "packagesPath": "C:\\Users\\TopAdmin\\.nuget\\packages\\",
         "outputPath": "C:\\DATA\\TIA-Openness-Rest-MCP\\TiaOpenness_Tool_Consts\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [

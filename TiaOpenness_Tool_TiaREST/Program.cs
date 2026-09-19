@@ -32,6 +32,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
 
       AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+      // Sync Openness firewall entry before any TIA attach (needs admin / elevated process).
+      OpennessWhitelist.TryUpdate(tiaVersion);
       RunServer(args);
     }
 

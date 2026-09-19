@@ -57,13 +57,13 @@ var app = builder.Build();
 // REST-API-App starten, falls sie nicht läuft
 await TiaRestManager.EnsureSidecarIsRunningAsync(restPath, apiKey, restPortStr, tiaVersion);
 
-// Middleware, um den API-Key zu prüfen
+// Middleware: accept X-API-Key (Cursor) or Authorization: Bearer (Hermes / OAuth-style clients)
 app.Use(async (context, next) => {
-  if (!context.Request.Headers.TryGetValue(Network.TiaRestApiKeyHeader, out var extractedApiKey) ||
-      extractedApiKey != apiKey) {
+  if (!IsAuthorized(context.Request, apiKey)) {
     context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
     context.Response.ContentType = "text/plain";
-    await context.Response.WriteAsync($"Error: Unauthorized access. Invalid or missing {Network.TiaRestApiKeyHeader}.");
+    await context.Response.WriteAsync(
+      $"Error: Unauthorized access. Provide header '{Network.TiaRestApiKeyHeader}' or 'Authorization: Bearer <token>'.");
     return;
   }
 
@@ -72,3 +72,23 @@ app.Use(async (context, next) => {
 
 app.MapMcp("/mcp");
 app.Run($"http://0.0.0.0:{portStr}");
+
+static bool IsAuthorized(HttpRequest request, string expectedApiKey) {
+  if (request.Headers.TryGetValue(Network.TiaRestApiKeyHeader, out var apiKeyHeader)
+      && string.Equals(apiKeyHeader.ToString(), expectedApiKey, StringComparison.Ordinal)) {
+    return true;
+  }
+
+  if (request.Headers.TryGetValue("Authorization", out var authorization)) {
+    string value = authorization.ToString().Trim();
+    const string bearerPrefix = "Bearer ";
+    if (value.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase)) {
+      string token = value.Substring(bearerPrefix.Length).Trim();
+      if (string.Equals(token, expectedApiKey, StringComparison.Ordinal)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}

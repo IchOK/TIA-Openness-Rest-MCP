@@ -1,16 +1,29 @@
 ﻿using Newtonsoft.Json;
+using Siemens.Engineering;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using Tophinke.TiaOpenness.Tool.Types.Block;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
+  /// <summary>
+  /// Stellt Methoden für den Zugriff auf PLC-Bausteine bereit.
+  /// </summary>
   static internal class cTiaBlocks {
+    /// <summary>
+    /// Gibt die Liste aller PLC-Bausteine in einem TIA-Projekt zurück.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="filterTypes">Filter für die Bausteintypen</query>
+    /// <returns>JSON-String mit der Liste der PLC-Bausteine oder Fehlermeldung</returns>
     static public string GetAll(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -45,6 +58,16 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
+    /// <summary>
+    /// Gibt den PLC-Baustein mit dem angegebenen Namen in einem TIA-Projekt zurück.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="blockName">Name des PLC-Bausteins</query>
+    /// <query name="deviceName">Name des Geräts</query>
+    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <returns>JSON-String mit dem PLC-Baustein als SD-Dokument oder Fehlermeldung</returns>
     static public string Get(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -62,7 +85,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             return errorMessage;
           }
 
-          PlcBlock block = cTiaBlockHelpers.FindBlock(plcBlockGroup, blockName);
+          PlcBlock block = cTiaFindHelpers.FindBlock(plcBlockGroup, blockName);
           if (block == null) {
             errorMessage = $"Error: Block with name {blockName} not found in PLC software {plcSoftware.Name}.";
             Console.Error.WriteLine(errorMessage);
@@ -71,7 +94,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             return errorMessage;
           }
 
-          errorMessage = cTiaBlockHelpers.ExportBlockAsDocuments(block, blockName, out string fileContent);
+          errorMessage = ExportBlock(block, blockName, out string fileContent, out string format);
           if (errorMessage != null) {
             Console.Error.WriteLine(errorMessage);
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -86,7 +109,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             BlockName = block.Name,
             BlockNumber = block.Number,
             BlockType = block.GetType().Name,
-            Format = "SimaticData/SD",
+            Format = format,
             Content = fileContent
           };
 
@@ -136,6 +159,105 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         blocks.AddRange(GetAll(userGroup, deviceName, deviceItemName, plcName, filterTypes, newPath));
       }
       return blocks;
+    }
+
+    /// <summary>
+    /// Exportiert einen PLC-Baustein als SD-Dokument oder XML.
+    /// </summary>
+    /// <param name="block">PLC-Baustein</param>
+    /// <param name="blockName">Name des PLC-Bausteins</param>
+    /// <param name="content">Out-Parameter für den Inhalt des SD-Dokuments oder XML</param>
+    /// <param name="format">Out-Parameter für das Format des Export-Ergebnisses</param>
+    /// <returns>Fehlermeldung oder null bei Erfolg</returns>
+    static private string ExportBlock(PlcBlock block, string blockName, out string content, out string format) {
+      content = null;
+      format = null;
+
+      if (block == null) {
+        return "Error exporting block " + blockName + ": block is null";
+      }
+      if (block.IsKnowHowProtected) {
+        return "Error exporting block " + blockName + ": block is know-how-protected";
+      }
+
+      if (IsExportBlockAsDocuments(block, blockName)) {
+        string error = ReadExportedDocument(blockName, out content);
+        if (error != null) {
+          return error;
+        }
+        format = "SimaticData/SD";
+        return null;
+      }
+
+      string xmlError = TryExportBlockAsXml(block, blockName, out content);
+      if (xmlError != null) {
+        return xmlError;
+      }
+      format = "SimaticML/XML";
+      return null;
+    }
+
+    /// <summary>
+    /// Prüft, ob ein PLC-Baustein als SD-Dokument exportiert werden soll.
+    /// </summary>
+    /// <param name="block">PLC-Baustein</param>
+    /// <param name="blockName">Name des PLC-Bausteins</param>
+    /// <returns>True, wenn der Baustein als SD-Dokument exportiert werden soll, false sonst</returns>
+    static private bool IsExportBlockAsDocuments(PlcBlock block, string blockName) {
+      string safeName = cTiaExportHelpers.SanitizeFileName(blockName);
+      DirectoryInfo exportDir = cTiaExportHelpers.EnsureExportDirectory();
+      try {
+        cTiaExportHelpers.TryDeleteExportedDocument(exportDir.FullName, safeName);
+        DocumentExportResult exportResult = block.ExportAsDocuments(exportDir, safeName);
+        return exportResult != null && exportResult.State == DocumentResultState.Success;
+      } catch {
+        return false;
+      }
+    }
+
+    /// <summary>
+    /// Liest den Inhalt eines exportierten SD-Dokuments.
+    /// </summary>
+    /// <param name="blockName">Name des PLC-Bausteins</param>
+    /// <param name="content">Out-Parameter für den Inhalt des SD-Dokuments</param>
+    /// <returns>Fehlermeldung oder null bei Erfolg</returns>
+    static private string ReadExportedDocument(string blockName, out string content) {
+      content = null;
+      string safeName = cTiaExportHelpers.SanitizeFileName(blockName);
+      DirectoryInfo exportDir = cTiaExportHelpers.EnsureExportDirectory();
+      FileInfo exportedFile = cTiaExportHelpers.FindExportedDocument(exportDir, safeName);
+      if (exportedFile == null || !exportedFile.Exists) {
+        return "ExportAsDocuments failed: exported document file not found.";
+      }
+      content = File.ReadAllText(exportedFile.FullName);
+      return null;
+    }
+
+    /// <summary>
+    /// Exportiert einen PLC-Baustein als XML.
+    /// </summary>
+    /// <param name="block">PLC-Baustein</param>
+    /// <param name="blockName">Name des PLC-Bausteins</param>
+    /// <param name="content">Out-parameter für den Inhalt des XML-Dokuments</param>
+    /// <returns>Fehlermeldung oder null bei Erfolg</returns>
+    static private string TryExportBlockAsXml(PlcBlock block, string blockName, out string content) {
+      content = null;
+      string safeName = cTiaExportHelpers.SanitizeFileName(blockName);
+      DirectoryInfo exportDir = cTiaExportHelpers.EnsureExportDirectory();
+      try {
+        cTiaExportHelpers.TryDeleteExportedDocument(exportDir.FullName, safeName);
+
+        FileInfo xmlFile = new FileInfo(Path.Combine(exportDir.FullName, safeName + ".xml"));
+        block.Export(xmlFile, ExportOptions.WithDefaults);
+        xmlFile.Refresh();
+        if (!xmlFile.Exists) {
+          return "ExportAsXml failed: exported XML file not found.";
+        }
+        content = File.ReadAllText(xmlFile.FullName);
+        return null;
+      } catch (Exception ex) {
+        return "ExportAsXml failed: " + ex.Message;
+      }
     }
 
     #endregion

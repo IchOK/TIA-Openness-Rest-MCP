@@ -1,16 +1,19 @@
-using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Types;
 using System;
-using System.IO;
-using Tophinke.TiaOpenness.Tool.Types.Block;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
   /// <summary>
-  /// Gemeinsame Hilfsmethoden für rekursive Suche und Export von PLC-Bausteinen.
+  /// Gemeinsame rekursive Suche, die von mehreren REST-Handlern genutzt wird.
   /// </summary>
-  static internal class cTiaBlockHelpers {
+  static internal class cTiaFindHelpers {
+    /// <summary>
+    /// Sucht rekursiv nach einem PLC-Baustein mit dem angegebenen Namen innerhalb einer PLC-Bausteinsgruppe.
+    /// </summary>
+    /// <param name="group">aktuelle Bausteinsgruppe</param>
+    /// <param name="blockName">Name des zu suchenden PLC-Bausteins</param>
+    /// <returns>Gefundener PLC-Baustein oder null</returns>
     static public PlcBlock FindBlock(PlcBlockGroup group, string blockName) {
       foreach (var block in group.Blocks) {
         if (block.Name.Equals(blockName, StringComparison.OrdinalIgnoreCase)) {
@@ -26,6 +29,12 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       return null;
     }
 
+    /// <summary>
+    /// Sucht rekursiv nach einem PLC-Datentype mit dem angegebenen Namen innerhalb einer PLC-Datentyp-Gruppe.
+    /// </summary>
+    /// <param name="group">aktuelle Datentyp-Gruppe</param>
+    /// <param name="typeName">Name des zu suchenden PLC-Datentyps</param>
+    /// <returns>Gefundener PLC-Datentyp oder null</returns>
     static public PlcType FindType(PlcTypeGroup group, string typeName) {
       foreach (var type in group.Types) {
         if (type.Name.Equals(typeName, StringComparison.OrdinalIgnoreCase)) {
@@ -40,7 +49,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
       return null;
     }
-
+    
+    /// <summary>
+    /// Sucht rekursiv nach einem PLC-Tagtabelle mit dem angegebenen Namen innerhalb einer PLC-Tagtabelle-Gruppe.
+    /// </summary>
+    /// <param name="group">aktuelle Tagtabelle-Gruppe</param>
+    /// <param name="tagTableName">Name des zu suchenden PLC-Tagtabelle</param>
+    /// <returns>Gefundene PLC-Tagtabelle oder null</returns>
     static public PlcTagTable FindTagTable(PlcTagTableGroup group, string tagTableName) {
       foreach (var table in group.TagTables) {
         if (table.Name.Equals(tagTableName, StringComparison.OrdinalIgnoreCase)) {
@@ -56,6 +71,12 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       return null;
     }
 
+    /// <summary>
+    /// Sucht rekursiv nach einem PLC-Tag mit dem angegebenen Namen innerhalb einer PLC-Tagtabelle-Gruppe.
+    /// </summary>
+    /// <param name="group">aktuelle Tagtabelle-Gruppe</param>
+    /// <param name="tagName">Name des zu suchenden PLC-Tag</param>
+    /// <returns>Gefundener PLC-Tag oder null</returns>
     static public PlcTag FindTag(PlcTagTableGroup group, string tagName) {
       foreach (var table in group.TagTables) {
         foreach (PlcTag tag in table.Tags) {
@@ -73,6 +94,12 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       return null;
     }
 
+    /// <summary>
+    /// Sucht rekursiv nach einem PLC-Systemkonstanten mit dem angegebenen Namen innerhalb einer PLC-Tagtabelle-Gruppe.
+    /// </summary>
+    /// <param name="group">aktuelle Tagtabelle-Gruppe</param>
+    /// <param name="constantName">Name des zu suchenden PLC-Systemkonstanten</param>
+    /// <returns>Gefundene PLC-Systemkonstante oder null</returns>
     static public PlcSystemConstant FindSystemConstant(PlcTagTableGroup group, string constantName) {
       foreach (var table in group.TagTables) {
         foreach (PlcSystemConstant constant in table.SystemConstants) {
@@ -88,32 +115,6 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         }
       }
       return null;
-    }
-
-    /// <summary>
-    /// Exportiert einen Baustein als SimaticData-Dokument und liest den Inhalt.
-    /// </summary>
-    /// <returns>Fehlermeldung oder null bei Erfolg</returns>
-    static public string ExportBlockAsDocuments(PlcBlock block, string blockName, out string content) {
-      content = null;
-      string tempFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "export");
-      FileInfo tempFileInfo = new FileInfo(Path.Combine(tempFilePath, $"{blockName}.s7dcl"));
-      try {
-        if (!Directory.Exists(tempFilePath)) {
-          Directory.CreateDirectory(tempFilePath);
-        }
-        if (tempFileInfo.Exists) {
-          File.Delete(tempFileInfo.FullName);
-        }
-        DocumentExportResult exportResult = block.ExportAsDocuments(tempFileInfo.Directory, blockName);
-        if (exportResult == null || exportResult.State != DocumentResultState.Success) {
-          return $"Error exporting block {blockName}.";
-        }
-        content = File.ReadAllText(tempFileInfo.FullName);
-        return null;
-      } catch (Exception ex) {
-        return $"Error exporting block {blockName}: {ex.Message}";
-      }
     }
   }
 }

@@ -18,6 +18,13 @@ using Tophinke.TiaOpenness.Tool.Types.UDT;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
   static internal class cTiaUDTs {
+    /// <summary>
+    /// Gibt die Liste der Datentypen (UDTs) in einem TIA-Projekt zurück.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <returns>JSON-String mit der Liste der Datentypen oder Fehlermeldung</returns>
     static public string List(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -54,6 +61,16 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
+    /// <summary>
+    /// Gibt den Datentyp (UDT) mit dem angegebenen Namen in einem TIA-Projekt zurück.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="udtName">Name des Datentyps</query>
+    /// <query name="deviceName">Name des Geräts</query>
+    /// <query name="deviceItemName">Name des Gerätelements</query>
+    /// <returns>JSON-String mit dem Datentyp als SD-Dokument oder Fehlermeldung</returns>
     static public string Get(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -72,7 +89,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           }
 
           // Suche nach dem angegebenen Block in der PLC-Software
-          PlcType type = Find(plcTypeGroup, typeName);
+          PlcType type = cTiaFindHelpers.FindType(plcTypeGroup, typeName);
           if (type == null) {
             errorMessage = $"Error: Type with name {typeName} not found in PLC software {plcSoftware.Name}.";
             Console.Error.WriteLine(errorMessage);
@@ -80,46 +97,26 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             context.Response.ContentType = "text/plain";
             return errorMessage;
           }
-          // UDT Exportieren und Daten zurückgeben (Files werden im Unterverzeichnis export der App gespeichert)
 
-          string tempFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "export");
-          FileInfo tempFileInfo = new FileInfo(Path.Combine(tempFilePath, $"{typeName}.s7dcl"));
-          try {
-            if (!Directory.Exists(tempFilePath)) {
-              Directory.CreateDirectory(tempFilePath);
-            }
-            if (tempFileInfo.Exists) {
-              File.Delete(tempFileInfo.FullName);
-            }
-            DocumentExportResult exportResult = type.ExportAsDocuments(tempFileInfo.Directory, typeName);
-            if (exportResult == null || exportResult.State != DocumentResultState.Success) {
-              errorMessage = $"Error exporting block {typeName}.";
-              Console.Error.WriteLine(errorMessage);
-              context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-              context.Response.ContentType = "text/plain";
-              return errorMessage;
-            }
-            string fileContent = File.ReadAllText(tempFileInfo.FullName);
-
-            var data = new Data {
-              DeviceName = deviceName,
-              DeviceItemName = deviceItemName,
-              PlcName = plcSoftware.Name,
-              UdtName = type.Name,
-              Format = "SimaticData/SD",
-              Content = fileContent
-            };
-
-            context.Response.ContentType = "application/json";
-            return JsonConvert.SerializeObject(data);
-
-          } catch (Exception ex) {
-            errorMessage = $"Error exporting block {typeName}: {ex.Message}";
+          errorMessage = ExportTypeAsDocuments(type, typeName, out string fileContent);
+          if (errorMessage != null) {
             Console.Error.WriteLine(errorMessage);
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
             context.Response.ContentType = "text/plain";
             return errorMessage;
           }
+
+          var data = new Data {
+            DeviceName = deviceName,
+            DeviceItemName = deviceItemName,
+            PlcName = plcSoftware.Name,
+            UdtName = type.Name,
+            Format = "SimaticData/SD",
+            Content = fileContent
+          };
+
+          context.Response.ContentType = "application/json";
+          return JsonConvert.SerializeObject(data);
         });
         return retValue;
       } catch (Siemens.Engineering.EngineeringObjectDisposedException ex) {
@@ -138,24 +135,34 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     #region Hilfsmethoden für TIA Openness Objektstruktur
 
     /// <summary>
-    /// Sucht rekursiv nach einem PLC-Datentype mit dem angegebenen Namen innerhalb einer PLC--Gruppe.
+    /// Exportiert einen Datentyp (UDT) als SD-Dokument.
     /// </summary>
-    /// <param name="group">aktuelle Block-Gruppe</param>
-    /// <param name="blockName">Name des zu suchenden Datenbausteins</param>
-    /// <returns></returns>
-    static private PlcType Find(PlcTypeGroup group, string blockName) {
-      foreach (var type in group.Types) {
-        if (type.Name.Equals(blockName, StringComparison.OrdinalIgnoreCase)) {
-          return type;
+    /// <param name="type">Datentyp (UDT)</param>
+    /// <param name="typeName">Name des Datentyps</param>
+    /// <param name="content">Out-Parameter für den Inhalt des SD-Dokuments</param>
+    /// <returns>Fehlermeldung, falls das Exportieren fehlschlägt, sonst null</returns>
+    static private string ExportTypeAsDocuments(PlcType type, string typeName, out string content) {
+      content = null;
+      string safeName = cTiaExportHelpers.SanitizeFileName(typeName);
+      DirectoryInfo exportDir = cTiaExportHelpers.EnsureExportDirectory();
+      try {
+        cTiaExportHelpers.TryDeleteExportedDocument(exportDir.FullName, safeName);
+        DocumentExportResult exportResult = type.ExportAsDocuments(exportDir, safeName);
+        if (exportResult == null || exportResult.State != DocumentResultState.Success) {
+          string details = cTiaExportHelpers.FormatExportMessages(exportResult);
+          return string.IsNullOrEmpty(details)
+            ? ("Error exporting type " + typeName + ".")
+            : ("Error exporting type " + typeName + ": " + details);
         }
-      }
-      foreach (var userGroup in group.Groups) {
-        var foundType = Find(userGroup, blockName);
-        if (foundType != null) {
-          return foundType;
+        FileInfo exportedFile = cTiaExportHelpers.FindExportedDocument(exportDir, safeName);
+        if (exportedFile == null || !exportedFile.Exists) {
+          return "Error exporting type " + typeName + ": export succeeded but no document file was found.";
         }
+        content = File.ReadAllText(exportedFile.FullName);
+        return null;
+      } catch (Exception ex) {
+        return "Error exporting type " + typeName + ": " + ex.Message;
       }
-      return null;
     }
 
     /// <summary>

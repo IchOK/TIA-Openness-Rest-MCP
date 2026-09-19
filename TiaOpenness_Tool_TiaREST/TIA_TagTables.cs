@@ -10,6 +10,13 @@ using Tophinke.TiaOpenness.Tool.Types.TagTable;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
   static internal class cTiaTagTables {
+    /// <summary>
+    /// Gibt die Liste der Tagtabellen in einem TIA-Projekt zurück.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <returns>JSON-String mit der Liste der Tagtabellen oder Fehlermeldung</returns>
     static public string List(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -43,6 +50,16 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
+    /// <summary>
+    /// Gibt die Tagtabelle mit dem angegebenen Namen in einem TIA-Projekt zurück.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="tagTableName">Name der Tagtabelle</query>
+    /// <query name="deviceName">Name des Geräts</query>
+    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <returns>JSON-String mit der Tagtabelle oder Fehlermeldung</returns>
     static public string Get(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -60,7 +77,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             return errorMessage;
           }
 
-          PlcTagTable tagTable = cTiaBlockHelpers.FindTagTable(plcTagTableGroup, tagTableName);
+          PlcTagTable tagTable = cTiaFindHelpers.FindTagTable(plcTagTableGroup, tagTableName);
           if (tagTable == null) {
             errorMessage = $"Error: Tag table with name {tagTableName} not found in PLC software {plcSoftware.Name}.";
             Console.Error.WriteLine(errorMessage);
@@ -124,6 +141,16 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
+    #region Hilfsmethoden für TIA Openness Objektstruktur
+
+    /// <summary>
+    /// Durchsucht die Ordnerstruktur einer PLC-Tagtabelle-Gruppe rekursiv nach Tagtabellen und fügt die gefundenen Informationen in eine Liste ein.
+    /// </summary>
+    /// <param name="group">aktuelle Tagtabelle-Gruppe</param>
+    /// <param name="list">Liste, in die die gefundenen Informationen hinzugefügt werden</param>
+    /// <param name="deviceName">Name des Geräts</param>
+    /// <param name="deviceItemName">Name des Gerätelements</param>
+    /// <param name="plcName">Name des PLCs</param>
     static private void List(PlcTagTableGroup group, List<Info> list, string deviceName, string deviceItemName, string plcName) {
       foreach (PlcTagTable table in group.TagTables) {
         list.Add(new Info {
@@ -138,5 +165,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         List(userGroup, list, deviceName, deviceItemName, plcName);
       }
     }
+
+    #endregion
+
   }
 }

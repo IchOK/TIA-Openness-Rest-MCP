@@ -17,6 +17,9 @@ using System.Threading.Tasks;
 using Tophinke.TiaOpenness.Tool.Types.Project;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
+  /// <summary>
+  /// Verwaltet die Verbindung zu einem TIA Portal-Prozess und stellt Methoden für den Zugriff auf Projekte bereit.
+  /// </summary>
   internal sealed class TiaConnectionManager : IDisposable {
     private static readonly Lazy<TiaConnectionManager> _instance = new Lazy<TiaConnectionManager>(() => new TiaConnectionManager());
     public static TiaConnectionManager Instance => _instance.Value;
@@ -27,6 +30,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
 
     private TiaConnectionManager() { }
 
+    /// <summary>
+    /// Stellt sicher, dass eine Verbindung zu einem TIA Portal-Prozess hergestellt ist.
+    /// </summary>
+    /// <param name="processId">Prozess-ID</param>
+    /// <exception cref="InvalidOperationException">Wird geworfen, wenn die Verbindung nicht hergestellt werden kann</exception>
     public void EnsureAttached(int processId) {
       lock (_lock) {
         if (_tia != null && _attachedProcessId == processId) {
@@ -43,11 +51,25 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         var process = TiaPortal.GetProcesses().FirstOrDefault(p => p.Id == processId);
         if (process == null) throw new InvalidOperationException($"TIA Process {processId} nicht gefunden.");
 
-        _tia = process.Attach(); // NICHT disposen, solange wir es verwenden
-        _attachedProcessId = processId;
+        try {
+          _tia = process.Attach(); // NICHT disposen, solange wir es verwenden
+          _attachedProcessId = processId;
+        } catch (Exception ex) {
+          TryDisposePortal();
+          throw new InvalidOperationException(
+            $"TIA Attach failed for process {processId}: {ex.GetType().Name}: {ex.Message}", ex);
+        }
       }
     }
 
+    /// <summary>
+    /// Führt eine Aktion mit einem Projekt aus und stellt sicher, dass die Verbindung zum TIA Portal-Prozess hergestellt ist.
+    /// </summary>
+    /// <typeparam name="T">Rückgabewert der Aktion</typeparam>
+    /// <param name="processIdStr">Prozess-ID</param>
+    /// <param name="projectName">Name des Projekts</param>
+    /// <param name="action">Aktion, die mit dem Projekt ausgeführt wird</param>
+    /// <returns>Rückgabewert der Aktion</returns>
     public T ExecuteWithProject<T>(string processIdStr, string projectName, Func<Project, T> action) {
       if (string.IsNullOrEmpty(processIdStr) || string.IsNullOrEmpty(projectName)) {
         throw new InvalidOperationException("Error: Process ID and project name must be provided.");
@@ -81,31 +103,41 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     }
   }
 
+  /// <summary>
+  /// Stellt Methoden für den Zugriff auf Projekte bereit.
+  /// </summary>
   static internal class cTiaProject {
     /// <summary>
     /// Gibt eine Liste aller offenen TIA Portal Instanzen und deren Projekte zurück.
     /// </summary>
-    /// <param name="context"></param>
-    /// <returns></returns>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <returns>JSON-String mit der Liste der offenen TIA Portal Instanzen und deren Projekte oder Fehlermeldung</returns>
     static public string List(HttpListenerContext context) {
       var processes = TiaPortal.GetProcesses();
       var projectInfos = new List<Info>();
       string errorMessage = string.Empty;
 
       foreach (var process in processes) {
-        using (var tia = process.Attach()) {
-          foreach (var proj in tia.Projects) {
-            projectInfos.Add(new Info {
-              ProcessId = process.Id,
-              Name = proj.Name,
-              Path = proj.Path.ToString()
-            });
+        try {
+          using (var tia = process.Attach()) {
+            foreach (var proj in tia.Projects) {
+              projectInfos.Add(new Info {
+                ProcessId = process.Id,
+                Name = proj.Name,
+                Path = proj.Path.ToString()
+              });
+            }
           }
+        } catch (Exception ex) {
+          Console.Error.WriteLine($"TIA Attach failed for process {process.Id}: {ex.GetType().Name}: {ex.Message}");
+          errorMessage = $"Error: TIA Attach denied/failed for process {process.Id}: {ex.Message}";
         }
       }
 
       if (projectInfos.Count == 0) {
-        errorMessage = "Error: No TIA Portal instances with open projects found.";
+        if (string.IsNullOrEmpty(errorMessage)) {
+          errorMessage = "Error: No TIA Portal instances with open projects found.";
+        }
         Console.Error.WriteLine(errorMessage);
         context.Response.StatusCode = (int)HttpStatusCode.NotFound;
         context.Response.ContentType = "text/plain";
@@ -147,7 +179,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
-
+    /// <summary>
+    /// Gibt die PLC-Software für ein Gerät in einem Projekt zurück.
+    /// </summary>
+    /// <param name="project">Projekt</param>
+    /// <param name="deviceName">Name des Geräts</param>
+    /// <param name="deviceItemName">Name des Geräteelements</param>
+    /// <param name="plcSoftware">Out-Parameter für die PLC-Software</param>
+    /// <returns>Fehlermeldung oder null bei Erfolg</returns>
     static public string GetPlcSoftware(Project project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware) {
       plcSoftware = null;
       if (project == null) {

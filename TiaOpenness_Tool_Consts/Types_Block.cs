@@ -26,7 +26,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.Block {
     public string BlockName { get; set; }      // z. B. "MotorData"
     public int BlockNumber { get; set; }       // z. B. 10
     public string BlockType { get; set; }      // z. B. "GlobalDB"
-    public string Format { get; set; }         // z. B. "SimaticData/XML, SimaticData/SD"
+    public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"
     public string Content { get; set; }
   }
 }

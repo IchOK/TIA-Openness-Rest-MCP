@@ -12,6 +12,18 @@ using Tophinke.TiaOpenness.Tool.Types.XRef;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
   static internal class cTiaXRefs {
+    /// <summary>
+    /// Gibt die Cross-References für ein Objekt in einem TIA-Projekt zurück.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="deviceName">Name des Geräts</query>
+    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="objectName">Name des Objekts</query>
+    /// <query name="objectKind">Art des Objekts</query>
+    /// <query name="filterStr">Filter für die Cross-References</query>
+    /// <returns>JSON-String mit den Cross-References oder Fehlermeldung</returns>
     static public string Get(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -98,11 +110,20 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
+    #region Hilfsmethoden für TIA Openness Objektstruktur
+    /// <summary>
+    /// Ermittelt das Objekt anhand des Objekt-Typs und -Namens.
+    /// </summary>
+    /// <param name="plcSoftware">PLC-Software</param>
+    /// <param name="objectKind">Art des Objekts</param>
+    /// <param name="objectName">Name des Objekts</param>
+    /// <param name="errorMessage">Fehlermeldung, falls das Objekt nicht gefunden wurde</param>
+    /// <returns>Gefundenes Objekt oder null</returns>
     static private IEngineeringServiceProvider ResolveObject(PlcSoftware plcSoftware, string objectKind, string objectName, out string errorMessage) {
       errorMessage = null;
       switch (objectKind.Trim().ToLowerInvariant()) {
         case "block": {
-          PlcBlock block = cTiaBlockHelpers.FindBlock(plcSoftware.BlockGroup, objectName);
+          PlcBlock block = cTiaFindHelpers.FindBlock(plcSoftware.BlockGroup, objectName);
           if (block == null) {
             errorMessage = $"Error: Block with name {objectName} not found in PLC software {plcSoftware.Name}.";
             return null;
@@ -110,7 +131,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           return block;
         }
         case "tag": {
-          PlcTag tag = cTiaBlockHelpers.FindTag(plcSoftware.TagTableGroup, objectName);
+          PlcTag tag = cTiaFindHelpers.FindTag(plcSoftware.TagTableGroup, objectName);
           if (tag == null) {
             errorMessage = $"Error: Tag with name {objectName} not found in PLC software {plcSoftware.Name}.";
             return null;
@@ -118,7 +139,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           return tag;
         }
         case "udt": {
-          PlcType type = cTiaBlockHelpers.FindType(plcSoftware.TypeGroup, objectName);
+          PlcType type = cTiaFindHelpers.FindType(plcSoftware.TypeGroup, objectName);
           if (type == null) {
             errorMessage = $"Error: UDT with name {objectName} not found in PLC software {plcSoftware.Name}.";
             return null;
@@ -126,7 +147,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           return type;
         }
         case "systemconstant": {
-          PlcSystemConstant constant = cTiaBlockHelpers.FindSystemConstant(plcSoftware.TagTableGroup, objectName);
+          PlcSystemConstant constant = cTiaFindHelpers.FindSystemConstant(plcSoftware.TagTableGroup, objectName);
           if (constant == null) {
             errorMessage = $"Error: System constant with name {objectName} not found in PLC software {plcSoftware.Name}.";
             return null;
@@ -139,6 +160,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
+    /// <summary>
+    /// Mappt ein SourceObject auf ein SourceInfo.
+    /// </summary>
+    /// <param name="source">SourceObject</param>
+    /// <returns>Mapped SourceInfo</returns>
     static private SourceInfo MapSource(SourceObject source) {
       var references = new List<ReferenceInfo>();
       if (source.References != null) {
@@ -165,6 +191,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       };
     }
 
+    /// <summary>
+    /// Mappt ein ReferenceObject auf ein ReferenceInfo.
+    /// </summary>
+    /// <param name="reference">ReferenceObject</param>
+    /// <returns>Mapped ReferenceInfo</returns>
     static private ReferenceInfo MapReference(ReferenceObject reference) {
       var locations = new List<LocationInfo>();
       if (reference.Locations != null) {
@@ -190,5 +221,6 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         Locations = locations
       };
     }
+    #endregion
   }
 }

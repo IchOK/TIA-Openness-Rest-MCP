@@ -52,7 +52,9 @@
   <ItemGroup>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="TIA_BlockHelpers.cs" />
+    <Compile Include="OpennessWhitelist.cs" />
+    <Compile Include="TIA_ExportHelpers.cs" />
+    <Compile Include="TIA_FindHelpers.cs" />
     <Compile Include="TIA_Blocks.cs" />
     <Compile Include="TIA_UDTs.cs" />
     <Compile Include="TIA_TagTables.cs" />
@@ -70,4 +72,15 @@
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- Soft whitelist sync: never fail the build; elevation happens via VS Code task after rebuild. -->
+  <Target Name="UpdateOpennessWhitelist" AfterTargets="Build">
+    <PropertyGroup>
+      <_OpennessWhitelistScript>$([System.IO.Path]::GetFullPath('$(ProjectDir)..\scripts\Update-TiaOpennessWhitelist.ps1'))</_OpennessWhitelistScript>
+      <_OpennessTiaVersion Condition=" '$(_OpennessTiaVersion)' == '' ">20.0</_OpennessTiaVersion>
+    </PropertyGroup>
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(_OpennessWhitelistScript)&quot; -ExePath &quot;$(TargetPath)&quot; -TiaVersion &quot;$(_OpennessTiaVersion)&quot; -NoElevate"
+          IgnoreExitCode="true"
+          StandardOutputImportance="high"
+          StandardErrorImportance="high" />
+  </Target>
 </Project>

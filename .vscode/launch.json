@@ -13,7 +13,7 @@
       "name": "TiaMCP",
       "type": "node-terminal",
       "request": "launch",
-      "preLaunchTask": "rebuild-mcp",
+      "preLaunchTask": "rebuild-all",
       "command": "dotnet exec \"${workspaceFolder}/TiaOpenness_Tool_TiaMCP/bin/Debug/net10.0/TiaOpenness_Tool_TiaMCP.dll\" --restpath \"${workspaceFolder}/TiaOpenness_Tool_TiaREST/bin/Debug/TiaOpenness_Tool_TiaREST.exe\"",
       "cwd": "${workspaceFolder}/TiaOpenness_Tool_TiaMCP"
     },

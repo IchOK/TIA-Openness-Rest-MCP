@@ -16,7 +16,7 @@
       "group": "build"
     },
     {
-      "label": "rebuild-rest",
+      "label": "rebuild-rest-compile",
       "type": "process",
       "command": "dotnet",
       "args": [
@@ -29,7 +29,27 @@
       "dependsOn": ["rebuild-shared"],
       "dependsOrder": "sequence",
       "problemMatcher": "$msCompile",
-      "group": "build"
+      "group": "build",
+      "detail": "Baut TiaREST neu (ohne UAC-Whitelist)"
+    },
+    {
+      "label": "update-openness-whitelist",
+      "type": "shell",
+      "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${workspaceFolder}/scripts/Update-TiaOpennessWhitelist.ps1\" -ExePath \"${workspaceFolder}/TiaOpenness_Tool_TiaREST/bin/Debug/TiaOpenness_Tool_TiaREST.exe\" -TiaVersion \"20.0\"",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "detail": "Aktualisiert den TIA Openness Whitelist-Eintrag (UAC falls noetig)"
+    },
+    {
+      "label": "rebuild-rest",
+      "dependsOrder": "sequence",
+      "dependsOn": ["rebuild-rest-compile", "update-openness-whitelist"],
+      "problemMatcher": [],
+      "group": "build",
+      "detail": "Baut TiaREST neu und aktualisiert die Openness-Whitelist"
     },
     {
       "label": "rebuild-mcp",
@@ -56,7 +76,7 @@
         "kind": "build",
         "isDefault": true
       },
-      "detail": "Baut Shared, TiaREST und TiaMCP neu (Debug)"
+      "detail": "Baut Shared, TiaREST und TiaMCP neu (Debug) inkl. Openness-Whitelist"
     }
   ]
 }

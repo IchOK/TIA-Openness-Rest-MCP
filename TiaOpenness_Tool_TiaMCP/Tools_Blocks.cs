@@ -1,7 +1,5 @@
 using ModelContextProtocol.Server;
 using System.ComponentModel;
-using System.Net;
-using System.Text.Json;
 using Tophinke.TiaOpenness.Tool.Consts;
 
 namespace Tophinke.TiaOpenness.Tool.TiaMCP;
@@ -53,24 +51,9 @@ public class BlockTools {
       }
 
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
-      string responseBody = await response.Content.ReadAsStringAsync();
-      return new McpApiResponse {
-        StatusCode = (int)response.StatusCode,
-        IsSuccess = response.IsSuccessStatusCode,
-        Data = JsonSerializer.Deserialize<JsonElement>(responseBody)
-      };
-    } catch (HttpRequestException) {
-      return new McpApiResponse {
-        StatusCode = (int)HttpStatusCode.BadGateway,
-        IsSuccess = false,
-        Error = "The TIA Openness REST API is not running or is not reachable."
-      };
+      return await TiaRestClient.FromHttpResponseAsync(response);
     } catch (Exception ex) {
-      return new McpApiResponse {
-        StatusCode = (int)HttpStatusCode.InternalServerError,
-        IsSuccess = false,
-        Error = $"An unexpected error occurred: {ex.Message}"
-      };
+      return TiaRestClient.FromException(ex);
     }
   }
 
@@ -85,8 +68,8 @@ public class BlockTools {
     "BlockName (block name), " +
     "BlockNumber (block number in the PLC), " +
     "BlockType (Openness type name such as FC, FB, OB, GlobalDB, …), " +
-    "Format (export format; typically \"SimaticData/SD\"), " +
-    "Content (full block text in SIMATIC SD / .s7dcl form: interface, attributes and program code where applicable).")]
+    "Format (\"SimaticData/SD\" for LAD/DB via ExportAsDocuments, or \"SimaticML/XML\" for SCL/FBD/STL/GRAPH/etc.), " +
+    "Content (block text: SIMATIC SD/.s7dcl or Simatic ML XML with interface, attributes and program code where applicable).")]
   public static async Task<McpApiResponse> GetBlock(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
@@ -99,24 +82,9 @@ public class BlockTools {
       string route = $"{BlockRoutes.Get}?processId={processId}&projectName={safeProjectName}&blockName={Uri.EscapeDataString(blockName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
-      string responseBody = await response.Content.ReadAsStringAsync();
-      return new McpApiResponse {
-        StatusCode = (int)response.StatusCode,
-        IsSuccess = response.IsSuccessStatusCode,
-        Data = JsonSerializer.Deserialize<JsonElement>(responseBody)
-      };
-    } catch (HttpRequestException) {
-      return new McpApiResponse {
-        StatusCode = (int)HttpStatusCode.BadGateway,
-        IsSuccess = false,
-        Error = "The TIA Openness REST API is not running or is not reachable."
-      };
+      return await TiaRestClient.FromHttpResponseAsync(response);
     } catch (Exception ex) {
-      return new McpApiResponse {
-        StatusCode = (int)HttpStatusCode.InternalServerError,
-        IsSuccess = false,
-        Error = $"An unexpected error occurred: {ex.Message}"
-      };
+      return TiaRestClient.FromException(ex);
     }
   }
 }
