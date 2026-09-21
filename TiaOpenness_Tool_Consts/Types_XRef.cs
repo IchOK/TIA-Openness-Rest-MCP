@@ -2,9 +2,6 @@ using System.Collections.Generic;
 
 namespace Tophinke.TiaOpenness.Tool.Types.XRef {
   public class LocationInfo {
-    public string Name { get; set; }
-    public string Address { get; set; }
-    public string TypeName { get; set; }
     public string Access { get; set; }
     public string ReferenceType { get; set; }
     public string ReferenceLocation { get; set; }
@@ -13,18 +10,11 @@ namespace Tophinke.TiaOpenness.Tool.Types.XRef {
 
   public class ReferenceInfo {
     public string Name { get; set; }
-    public string Path { get; set; }
-    public string Address { get; set; }
-    public string Device { get; set; }
-    public string TypeName { get; set; }
     public List<LocationInfo> Locations { get; set; }
   }
 
   public class SourceInfo {
     public string Name { get; set; }
-    public string Path { get; set; }
-    public string Address { get; set; }
-    public string Device { get; set; }
     public string TypeName { get; set; }
     public List<ReferenceInfo> References { get; set; }
     public List<SourceInfo> Children { get; set; }

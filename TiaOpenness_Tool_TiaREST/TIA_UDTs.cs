@@ -98,7 +98,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             return errorMessage;
           }
 
-          errorMessage = ExportTypeAsDocuments(type, typeName, out string fileContent);
+          errorMessage = ExportAsDocuments(type, typeName, out string fileContent, out string multiLingualText);
           if (errorMessage != null) {
             Console.Error.WriteLine(errorMessage);
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -112,7 +112,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             PlcName = plcSoftware.Name,
             UdtName = type.Name,
             Format = "SimaticData/SD",
-            Content = fileContent
+            Content = fileContent,
+            MultiLingualText = multiLingualText
           };
 
           context.Response.ContentType = "application/json";
@@ -141,25 +142,35 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// <param name="typeName">Name des Datentyps</param>
     /// <param name="content">Out-Parameter für den Inhalt des SD-Dokuments</param>
     /// <returns>Fehlermeldung, falls das Exportieren fehlschlägt, sonst null</returns>
-    static private string ExportTypeAsDocuments(PlcType type, string typeName, out string content) {
+    static private string ExportAsDocuments(PlcType type, string typeName, out string content, out string multiLingualText) {
       content = null;
+      multiLingualText = null;
       string safeName = cTiaExportHelpers.SanitizeFileName(typeName);
       DirectoryInfo exportDir = cTiaExportHelpers.EnsureExportDirectory();
       try {
         cTiaExportHelpers.TryDeleteExportedDocument(exportDir.FullName, safeName);
+
         DocumentExportResult exportResult = type.ExportAsDocuments(exportDir, safeName);
-        if (exportResult == null || exportResult.State != DocumentResultState.Success) {
+        if (exportResult != null && exportResult.State == DocumentResultState.Success) {
+          // Context File
+          FileInfo exportedFile = new FileInfo(Path.Combine(exportDir.FullName, safeName + ".s7dcl"));
+          if (!exportedFile.Exists) {
+            return "Error exporting type " + typeName + ": exported document file not found.";
+          }
+          content = File.ReadAllText(exportedFile.FullName);
+
+          // Multi-Lingual Text File
+          exportedFile = new FileInfo(Path.Combine(exportDir.FullName, safeName + ".s7res"));
+          if (exportedFile.Exists) {
+            multiLingualText = File.ReadAllText(exportedFile.FullName);
+          }
+          return null;
+        } else {
           string details = cTiaExportHelpers.FormatExportMessages(exportResult);
           return string.IsNullOrEmpty(details)
             ? ("Error exporting type " + typeName + ".")
             : ("Error exporting type " + typeName + ": " + details);
         }
-        FileInfo exportedFile = cTiaExportHelpers.FindExportedDocument(exportDir, safeName);
-        if (exportedFile == null || !exportedFile.Exists) {
-          return "Error exporting type " + typeName + ": export succeeded but no document file was found.";
-        }
-        content = File.ReadAllText(exportedFile.FullName);
-        return null;
       } catch (Exception ex) {
         return "Error exporting type " + typeName + ": " + ex.Message;
       }

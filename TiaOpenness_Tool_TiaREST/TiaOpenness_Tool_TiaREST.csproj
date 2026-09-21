@@ -59,6 +59,7 @@
     <Compile Include="TIA_UDTs.cs" />
     <Compile Include="TIA_TagTables.cs" />
     <Compile Include="TIA_XRefs.cs" />
+    <Compile Include="TIA_Messages.cs" />
     <Compile Include="TIA_Project.cs" />
   </ItemGroup>
   <ItemGroup>

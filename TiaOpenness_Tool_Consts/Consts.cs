@@ -33,6 +33,7 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   public static class BlockRoutes {
     public const string List = "/api/blocks";
     public const string Get = "/api/blocks/get";
+    public const string ExportCapabilities = "/api/blocks/export-capabilities";
   }
 
   /// <summary>
@@ -56,5 +57,12 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   public static class TagTableRoutes {
     public const string List = "/api/tagtables";
     public const string Get = "/api/tagtables/get";
+  }
+
+  /// <summary>
+  /// Konstanten für die Melde-/Message-Routen.
+  /// </summary>
+  public static class MessageRoutes {
+    public const string List = "/api/messages";
   }
 }

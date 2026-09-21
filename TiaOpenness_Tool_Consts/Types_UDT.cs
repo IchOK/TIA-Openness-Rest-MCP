@@ -23,6 +23,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.UDT {
     public string UdtName { get; set; }
     public string Format { get; set; }
     public string Content { get; set; }
+    public string MultiLingualText { get; set; }
   }
 }
 

@@ -16,6 +16,8 @@
 *.pdb
 *.i
 *.obj
+bin/
+obj/
 
 # ==========================================
 # 3. Test-Ergebnisse & Abdeckung

@@ -1,4 +1,6 @@
+using Siemens.Engineering;
 using Siemens.Engineering.SW.Blocks;
+using Siemens.Engineering.SW.Blocks.Interface;
 using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Types;
 using System;
@@ -27,6 +29,58 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         }
       }
       return null;
+    }
+
+    static public void PrintObjectInfos(Object obj) {
+      if (obj == null) {
+        Console.WriteLine("Object is null.");
+        return;
+      }
+      Console.WriteLine($"Object Type: {obj.GetType().Name}");
+      try {
+        foreach (var Info in ((IEngineeringObject)obj).GetCompositionInfos()) {
+          Console.WriteLine($"CompositionInfo: {Info.Name} = {Info.GetType().FullName}");
+        }
+      } catch (Exception ex) {
+        Console.WriteLine($"Error getting CompositionInfos: {ex.Message}");
+      }
+      try {
+        foreach (var Info in ((IEngineeringObject)obj).GetAttributeInfos()) {
+          Console.WriteLine($"AttributeInfo: {Info.Name} = {Info.GetType().FullName}, Access: {Info.AccessMode}");
+          foreach (var Info2 in Info.SupportedTypes) {
+            Console.WriteLine($"  ParameterInfos: {Info2.Name} = {Info2.GetType().FullName}");
+          }
+        }
+      } catch (Exception ex) {
+        Console.WriteLine($"Error getting AttributeInfos: {ex.Message}");
+      }
+      try {
+        foreach (var Info in ((IEngineeringObject)obj).GetInvocationInfos()) {
+          Console.WriteLine($"InvocationInfo: {Info.Name} = {Info.GetType().FullName}");
+          foreach (var Info2 in Info.ParameterInfos) {
+            Console.WriteLine($"  ParameterInfos: {Info2.Name} = {Info2.GetType().FullName}");
+          }
+        }
+      } catch (Exception ex) {
+        Console.WriteLine($"Error getting InvocationInfos: {ex.Message}");
+      }
+      try {
+        foreach (var Info in ((IEngineeringServiceProvider)obj).GetServiceInfos()) {
+          Console.WriteLine($"ServiceInfo: {Info.ToString()} = {Info.GetType().FullName}");
+        }
+      } catch (Exception ex) {
+        Console.WriteLine($"Error getting ServiceInfos: {ex.Message}");
+      }
+      try {
+        foreach (var Info in ((IEngineeringComposition)obj).GetCreationInfos()) {
+          Console.WriteLine($"CreationInfo: {Info.ToString()} = {Info.GetType().FullName}");
+          foreach (var Info2 in Info.ParameterInfos) {
+            Console.WriteLine($"  ParameterInfos: {Info2.Name} = {Info2.GetType().FullName}");
+          }
+        }
+      } catch (Exception ex) {
+        Console.WriteLine($"Error getting CreationInfos: {ex.Message}");
+      }
     }
 
     /// <summary>

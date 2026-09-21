@@ -1,6 +1,7 @@
 using Newtonsoft.Json;
 using Siemens.Engineering;
 using Siemens.Engineering.CrossReference;
+using Siemens.Engineering.HmiUnified.UI.Enum;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.Tags;
@@ -22,6 +23,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <query name="objectName">Name des Objekts</query>
     /// <query name="objectKind">Art des Objekts</query>
+    /// <query name="tagName">Name des Tags innerhalb der Datenbausteins</query>
     /// <query name="filterStr">Filter für die Cross-References</query>
     /// <returns>JSON-String mit den Cross-References oder Fehlermeldung</returns>
     static public string Get(HttpListenerContext context) {
@@ -31,6 +33,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       string deviceItemName = context.Request.QueryString["deviceItemName"];
       string objectName = context.Request.QueryString["objectName"];
       string objectKind = context.Request.QueryString["objectKind"];
+      string tagName = context.Request.QueryString["tagName"];
+      string refType = context.Request.QueryString["refType"];
       string filterStr = context.Request.QueryString["filter"];
 
       if (string.IsNullOrEmpty(objectName) || string.IsNullOrEmpty(objectKind)) {
@@ -77,9 +81,54 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
 
           CrossReferenceResult result = xrefService.GetCrossReferences(filter);
           var sources = new List<SourceInfo>();
-          if (result != null && result.Sources != null) {
-            foreach (SourceObject source in result.Sources) {
-              sources.Add(MapSource(source));
+          ReferenceType? referenceType = null;
+          //     "Assigns" relation. Represents the case when some object is assigned as a parameter to another one
+          //     "DefinedBy" relation, Represents the case when some object is defined by another one
+          //     "Defines" relation, Represents the case when some object defines another one
+          //     "GroupMember" relation. Represents the case when some object contains another one, is the opposite one to the "Belongs" relation.
+          //     "InstanceType" relation, Represents the case when some object is instance of another one
+          //     "MemberGroup" relation. Represents the case when some object belongs to another one
+          //     "OverlapsWith" relation, Represents the case when some object shares the same address range (fully or partially) with another object
+          //     "Scope" relation, Represents the case when some object defines a scope for another one.
+          //     "TypeInstance" relation, Represents the case when some object is representing the type of another one.
+          //     "Undefined" relation. Represents a relation that is not defined, The default ReferenceType value.
+          //     "Unknown" relation, Represents the case when relationship between objects are not known/error in relationship
+          //     "UsedBy" relation, Represents a case when some object is used by another one.
+          //     "Uses" relation, Represents a case when some object uses another one
+
+          if (Enum.TryParse<ReferenceType>(refType, true, out ReferenceType tempRefType)) {
+            referenceType = tempRefType;
+          }
+          if (objectKind.Trim().ToLowerInvariant() == "dbtag") {
+            if (string.IsNullOrEmpty(tagName)) {
+              context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+              context.Response.ContentType = "text/plain";
+              return "Error: tagName must be provided for dbtag objects.";
+            }
+            SourceObject source = FindDbTag(result, "\"" + objectName + "\"." + tagName);
+            if (source.References != null) {
+              var references = new List<ReferenceInfo>();
+              foreach (ReferenceObject reference in source.References) {
+                ReferenceInfo retRef = MapReference(reference, referenceType);
+                if (retRef != null) {
+                  references.Add(retRef);
+                }
+              }
+              sources.Add(new SourceInfo {
+                Name = source.Name,
+                TypeName = source.TypeName,
+                References = references,
+                Children = new List<SourceInfo>()
+              });
+            }
+          } else {
+            if (result != null && result.Sources != null) {
+              foreach (SourceObject source in result.Sources) {
+                SourceInfo retSrc = MapSource(source, referenceType);
+                if (retSrc != null) {
+                  sources.Add(retSrc);
+                }
+              }
             }
           }
 
@@ -130,6 +179,17 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           }
           return block;
         }
+        case "dbtag": {
+          PlcBlock block = cTiaFindHelpers.FindBlock(plcSoftware.BlockGroup, objectName);
+          if (block == null) {
+            errorMessage = $"Error: Block with name {objectName} not found in PLC software {plcSoftware.Name}.";
+            return null;
+          } else if (!(block is DataBlock)) {
+            errorMessage = $"Error: Block with name {objectName} is not a Datablock.";
+            return null;
+          }
+          return block;
+        }
         case "tag": {
           PlcTag tag = cTiaFindHelpers.FindTag(plcSoftware.TagTableGroup, objectName);
           if (tag == null) {
@@ -160,35 +220,71 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
+    static private SourceObject FindDbTag(CrossReferenceResult result, string tagName) {
+      if (result != null && result.Sources != null) {
+        foreach (SourceObject source in result.Sources) {
+          SourceObject childChild = FindDbTag(source, tagName);
+          if (childChild != null) {
+            return childChild;
+          }
+        }
+      }
+      return null;
+    }
+
+    static private SourceObject FindDbTag(SourceObject source, string tagName) {
+      if (source.Children != null) {
+        foreach (SourceObject child in source.Children) {
+          if (child.Name == tagName) {
+            return child; 
+          } else {
+            SourceObject childChild = FindDbTag(child, tagName);
+            if (childChild != null) {
+              return childChild;
+            }
+          }
+        }
+      }
+      return null;
+    }
+
+
     /// <summary>
     /// Mappt ein SourceObject auf ein SourceInfo.
     /// </summary>
     /// <param name="source">SourceObject</param>
     /// <returns>Mapped SourceInfo</returns>
-    static private SourceInfo MapSource(SourceObject source) {
+    static private SourceInfo MapSource(SourceObject source, ReferenceType? referenceType) {
       var references = new List<ReferenceInfo>();
       if (source.References != null) {
         foreach (ReferenceObject reference in source.References) {
-          references.Add(MapReference(reference));
+          ReferenceInfo retRef = MapReference(reference, referenceType);
+          if (retRef != null) {
+            references.Add(retRef);
+          }
         }
       }
 
       var children = new List<SourceInfo>();
       if (source.Children != null) {
         foreach (SourceObject child in source.Children) {
-          children.Add(MapSource(child));
+          SourceInfo retSrc = MapSource(child, referenceType);
+          if (retSrc != null) {
+            children.Add(retSrc);
+          }
         }
       }
 
-      return new SourceInfo {
-        Name = source.Name,
-        Path = source.Path,
-        Address = source.Address,
-        Device = source.Device,
-        TypeName = source.TypeName,
-        References = references,
-        Children = children
-      };
+      if (references.Count > 0 || children.Count > 0) {
+        return new SourceInfo {
+          Name = source.Name.Replace("\"",""),
+          TypeName = source.TypeName.Replace("\"", ""),
+          References = references,
+          Children = children
+        };
+      } else {
+        return null;
+      }
     }
 
     /// <summary>
@@ -196,30 +292,29 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// </summary>
     /// <param name="reference">ReferenceObject</param>
     /// <returns>Mapped ReferenceInfo</returns>
-    static private ReferenceInfo MapReference(ReferenceObject reference) {
+    static private ReferenceInfo MapReference(ReferenceObject reference, ReferenceType? referenceType) {
       var locations = new List<LocationInfo>();
       if (reference.Locations != null) {
         foreach (Location location in reference.Locations) {
-          locations.Add(new LocationInfo {
-            Name = location.Name,
-            Address = location.Address,
-            TypeName = location.TypeName,
-            Access = location.Access.ToString(),
-            ReferenceType = location.ReferenceType.ToString(),
-            ReferenceLocation = location.ReferenceLocation,
-            ReferencedAsName = location.ReferencedAsName
-          });
+          if (referenceType == null || referenceType == location.ReferenceType) {
+            locations.Add(new LocationInfo {
+              Access = location.Access.ToString(),
+              ReferenceType = location.ReferenceType.ToString(),
+              ReferenceLocation = location.ReferenceLocation.Replace("\"", "").Replace("@",""),
+              ReferencedAsName = location.ReferencedAsName
+            });
+          }
         }
       }
 
-      return new ReferenceInfo {
-        Name = reference.Name,
-        Path = reference.Path,
-        Address = reference.Address,
-        Device = reference.Device,
-        TypeName = reference.TypeName,
-        Locations = locations
-      };
+      if (locations.Count > 0) {
+        return new ReferenceInfo {
+          Name = reference.Name.Replace("\"", ""),
+          Locations = locations
+        };
+      } else {
+        return null;
+      }
     }
     #endregion
   }

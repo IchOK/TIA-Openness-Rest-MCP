@@ -26,6 +26,7 @@ public class BlockTools {
     "BlockName (block name, required for GetBlock), " +
     "BlockNumber (block number in the PLC), " +
     "BlockType (Openness type name such as FC, FB, OB, GlobalDB, …), " +
+    "ProgrammingLanguage (e.g. LAD, SCL, FBD, STL, DB), " +
     "Path (string array of user group/folder names from the block group root to the block; empty if the block is in the root).")]
   public static async Task<McpApiResponse> ListBlocks(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
@@ -80,6 +81,30 @@ public class BlockTools {
       Console.WriteLine("Baustein wird abgerufen...");
       string safeProjectName = Uri.EscapeDataString(projectName);
       string route = $"{BlockRoutes.Get}?processId={processId}&projectName={safeProjectName}&blockName={Uri.EscapeDataString(blockName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
+
+      using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
+      return await TiaRestClient.FromHttpResponseAsync(response);
+    } catch (Exception ex) {
+      return TiaRestClient.FromException(ex);
+    }
+  }
+
+  [McpServerTool, Description(
+    "Probes export support per ProgrammingLanguage found in a TIA project. " +
+    "Walks all blocks, picks one non-know-how-protected sample per ProgrammingLanguage, " +
+    "and tries ExportAsDocuments (SIMATIC SD) and Simatic ML XML export. " +
+    "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
+    "On success, Data is a JSON array of objects with: " +
+    "ProgrammingLanguage, SampleBlockName, SampleBlockType, DeviceName, DeviceItemName, PlcName, " +
+    "DocumentsSupported (bool), DocumentsExtensions (e.g. [\".s7dcl\",\".s7res\"]), DocumentsError, " +
+    "XmlSupported (bool), XmlExtension (typically \".xml\"), XmlError.")]
+  public static async Task<McpApiResponse> ListBlockExportCapabilities(
+    [Description("The ProcessId of the TIA Portal instance")] int processId,
+    [Description("The name of the project")] string projectName) {
+    try {
+      Console.WriteLine("Export-Fähigkeiten werden geprüft...");
+      string safeProjectName = Uri.EscapeDataString(projectName);
+      string route = $"{BlockRoutes.ExportCapabilities}?processId={processId}&projectName={safeProjectName}";
 
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
       return await TiaRestClient.FromHttpResponseAsync(response);

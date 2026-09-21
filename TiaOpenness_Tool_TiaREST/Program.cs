@@ -95,6 +95,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaBlocks.GetAll(context);
           } else if (path == BlockRoutes.Get) {
             responseString = cTiaBlocks.Get(context);
+          } else if (path == BlockRoutes.ExportCapabilities) {
+            responseString = cTiaBlocks.ListExportCapabilities(context);
           }
 
           // Routen für Datentypen
@@ -114,6 +116,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           // Routen für Querverweise
           else if (path == XRefRoutes.Get) {
             responseString = cTiaXRefs.Get(context);
+          }
+
+          // Routen für Meldungen
+          else if (path == MessageRoutes.List) {
+            responseString = cTiaMessages.List(context);
           }
 
           // Route nicht gefunden

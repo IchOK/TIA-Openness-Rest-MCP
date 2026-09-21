@@ -13,6 +13,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.Block {
     public string BlockName { get; set; }      // z. B. "MotorData"
     public int BlockNumber { get; set; }       // z. B. 10
     public string BlockType { get; set; }      // z. B. "GlobalDB"
+    public string ProgrammingLanguage { get; set; } // z. B. "LAD", "SCL", "DB"
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
   }
 
@@ -26,8 +27,30 @@ namespace Tophinke.TiaOpenness.Tool.Types.Block {
     public string BlockName { get; set; }      // z. B. "MotorData"
     public int BlockNumber { get; set; }       // z. B. 10
     public string BlockType { get; set; }      // z. B. "GlobalDB"
+    public string ProgrammingLanguage { get; set; } // z. B. "LAD", "SCL", "DB"
     public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"
     public string Content { get; set; }
+    public string MultiLingualText { get; set; } 
+  }
+
+  /// <summary>
+  /// Ergebnis der Export-Probe für eine ProgrammingLanguage (ein Beispielbaustein).
+  /// </summary>
+  public class ExportCapabilityInfo {
+    public string ProgrammingLanguage { get; set; }
+    public string SampleBlockName { get; set; }
+    public string SampleBlockType { get; set; }
+    public string DeviceName { get; set; }
+    public string DeviceItemName { get; set; }
+    public string PlcName { get; set; }
+
+    public bool DocumentsSupported { get; set; }
+    public string[] DocumentsExtensions { get; set; }
+    public string DocumentsError { get; set; }
+
+    public bool XmlSupported { get; set; }
+    public string XmlExtension { get; set; }
+    public string XmlError { get; set; }
   }
 }
 

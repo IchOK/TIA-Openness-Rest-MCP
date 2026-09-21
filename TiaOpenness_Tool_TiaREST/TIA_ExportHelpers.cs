@@ -13,8 +13,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// </summary>
     /// <returns>Export-Verzeichnis</returns>
     static public DirectoryInfo EnsureExportDirectory() {
-      string exportRoot = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "export");
-      return Directory.CreateDirectory(exportRoot);
+      // Openness ExportAsDocuments verlangt einen absoluten Pfad (kein relativer directoryInfo).
+      string exportRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "export"));
+      Directory.CreateDirectory(exportRoot);
+      return new DirectoryInfo(exportRoot);
     }
 
     /// <summary>
@@ -30,25 +32,6 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         name = name.Replace(c, '_');
       }
       return name;
-    }
-
-    /// <summary>
-    /// Sucht nach einer Export-Datei mit dem angegebenen Basisnamen in einem Verzeichnis.
-    /// </summary>
-    /// <param name="directory">Verzeichnis</param>
-    /// <param name="baseName">Basisname</param>
-    /// <returns>Gefundene Export-Datei oder null</returns>
-    static public FileInfo FindExportedDocument(DirectoryInfo directory, string baseName) {
-      FileInfo preferred = new FileInfo(Path.Combine(directory.FullName, baseName + ".s7dcl"));
-      if (preferred.Exists) {
-        return preferred;
-      }
-      FileInfo[] matches = directory.GetFiles(baseName + ".*");
-      if (matches.Length > 0) {
-        return matches[0];
-      }
-      FileInfo[] any = directory.GetFiles();
-      return any.Length > 0 ? any[0] : null;
     }
 
     /// <summary>
