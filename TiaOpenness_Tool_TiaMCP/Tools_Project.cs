@@ -1,3 +1,4 @@
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using Tophinke.TiaOpenness.Tool.Consts;
@@ -14,15 +15,15 @@ public class ProjectTools {
     "ProcessId (TIA Portal process ID; pass as processId to other tools), " +
     "Name (project name; pass as projectName to other tools), " +
     "Path (full file system path of the project).")]
-  public static async Task<McpApiResponse> ListProjects() {
+  public static async Task<CallToolResult> ListProjects() {
+    var activity = ToolActivity.Start<ProjectTools>("TIA Portal Projekte werden abgerufen");
     try {
-      Console.WriteLine("TIA Portal Projekte werden abgerufen...");
       string route = $"{ProjectRoutes.List}";
 
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
-      return await TiaRestClient.FromHttpResponseAsync(response);
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
-      return TiaRestClient.FromException(ex);
+      return activity.Complete(TiaRestClient.FromException(ex));
     }
   }
 }

@@ -55,6 +55,7 @@
     <Compile Include="OpennessWhitelist.cs" />
     <Compile Include="TIA_ExportHelpers.cs" />
     <Compile Include="TIA_FindHelpers.cs" />
+    <Compile Include="TIA_RequestHelpers.cs" />
     <Compile Include="TIA_Blocks.cs" />
     <Compile Include="TIA_UDTs.cs" />
     <Compile Include="TIA_TagTables.cs" />

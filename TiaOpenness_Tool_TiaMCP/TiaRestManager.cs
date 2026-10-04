@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -14,19 +15,16 @@ public static class TiaRestManager {
   /// Prüft ob das Sidecar läuft. Wenn nicht, wird die .exe gestartet.
   /// </summary>
   public static async Task EnsureSidecarIsRunningAsync(string restExePath, string restApiKey, string restPort, string tiaVersion) {
+    ILogger logger = AppLog.For(typeof(TiaRestManager));
     if (await IsRestApiAliveAsync()) {
-      Console.WriteLine("[TiaRestManager] REST-API läuft bereits und ist erreichbar.");
+      logger.LogInformation("REST-API läuft bereits und ist erreichbar.");
       return;
     }
 
-    Console.ForegroundColor = ConsoleColor.Yellow;
-    Console.WriteLine("[TiaRestManager] REST-API antwortet nicht. Versuche Prozess zu starten...");
-    Console.ResetColor();
+    logger.LogWarning("REST-API antwortet nicht. Versuche Prozess zu starten...");
 
     if (!File.Exists(restExePath)) {
-      Console.ForegroundColor = ConsoleColor.Red;
-      Console.WriteLine($"[TiaRestManager] FEHLER: .exe wurde unter '{restExePath}' nicht gefunden!");
-      Console.ResetColor();
+      logger.LogError("FEHLER: .exe wurde unter '{RestExePath}' nicht gefunden!", restExePath);
       return;
     }
 
@@ -48,7 +46,7 @@ public static class TiaRestManager {
       CreateNoWindow = false   // Auf 'true' stellen, falls das Sidecar komplett unsichtbar im Hintergrund laufen soll
     };
 
-    Console.WriteLine($"[TiaRestManager] Starte REST-API mit Befehl: {startInfo.FileName} {startInfo.Arguments}");
+    logger.LogInformation("Starte REST-API mit Befehl: {FileName} {Arguments}", startInfo.FileName, startInfo.Arguments);
     try {
       Process.Start(startInfo);
 
@@ -56,16 +54,14 @@ public static class TiaRestManager {
       for (int i = 0; i < 10; i++) {
         await Task.Delay(1000);
         if (await IsRestApiAliveAsync()) {
-          Console.ForegroundColor = ConsoleColor.Green;
-          Console.WriteLine("[TiaRestManager] REST-API wurde erfolgreich gestartet!");
-          Console.ResetColor();
+          logger.LogInformation("REST-API wurde erfolgreich gestartet!");
           return;
         }
       }
 
-      Console.WriteLine("[TiaRestManager] WARNUNG: Prozess wurde gestartet, antwortet aber noch nicht.");
+      logger.LogWarning("Prozess wurde gestartet, antwortet aber noch nicht.");
     } catch (Exception ex) {
-      Console.WriteLine($"[TiaRestManager] FEHLER beim Starten der REST-App: {ex.Message}");
+      logger.LogError("FEHLER beim Starten der REST-App: {Message}", ex.Message);
     }
   }
 

@@ -20,13 +20,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddCommandLine(args, switchMappings);
 
 // API-Key aus den Parametern verwenden, sondt mit Default-KEY starten
-string? apiKey = builder.Configuration["apiKey"];
-if (string.IsNullOrWhiteSpace(apiKey)) {
-  apiKey = Network.TiaRestApiKeyDefault;
-  Console.ForegroundColor = ConsoleColor.Red;
-  Console.WriteLine("ACHTUNG: MCP-Server läuft mit Default-Key");
-  Console.ResetColor();
-}
+string? configuredApiKey = builder.Configuration["apiKey"];
+bool usesDefaultApiKey = string.IsNullOrWhiteSpace(configuredApiKey);
+string apiKey = usesDefaultApiKey ? Network.TiaRestApiKeyDefault : configuredApiKey!;
 string? portStr = builder.Configuration["port"];
 if (string.IsNullOrWhiteSpace(portStr)) {
   portStr = Network.TiaMcpPort.ToString();
@@ -53,6 +49,12 @@ builder.Services.AddMcpServer()
   .WithToolsFromAssembly(); // Lädt automatisch McpServerToolType-Klasse
 
 var app = builder.Build();
+
+// Logger für statische Tools und Hilfsklassen; Level und Format kommen aus appsettings (Logging)
+AppLog.Initialize(app.Services.GetRequiredService<ILoggerFactory>());
+if (usesDefaultApiKey) {
+  app.Logger.LogWarning("ACHTUNG: MCP-Server läuft mit Default-Key");
+}
 
 // REST-API-App starten, falls sie nicht läuft
 await TiaRestManager.EnsureSidecarIsRunningAsync(restPath, apiKey, restPortStr, tiaVersion);

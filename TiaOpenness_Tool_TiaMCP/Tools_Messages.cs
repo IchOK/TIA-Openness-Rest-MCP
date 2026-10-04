@@ -1,3 +1,4 @@
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using Tophinke.TiaOpenness.Tool.Consts;
@@ -21,13 +22,13 @@ public class MessageTools {
     "Path (string array of user group folders to the DB), " +
     "DeviceName, DeviceItemName, PlcName (PLC context), " +
     "ConfMemberPath (member path of the config element inside the DB).")]
-  public static async Task<McpApiResponse> ListMessages(
+  public static async Task<CallToolResult> ListMessages(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Optional device / station name to limit the scan")] string? deviceName = null,
     [Description("Optional CPU / device item name to limit the scan")] string? deviceItemName = null) {
+    var activity = ToolActivity.Start<MessageTools>("Meldungen werden gesammelt");
     try {
-      Console.WriteLine("Meldungen werden gesammelt...");
       string safeProjectName = Uri.EscapeDataString(projectName);
       string route = $"{MessageRoutes.List}?processId={processId}&projectName={safeProjectName}";
       if (!string.IsNullOrWhiteSpace(deviceName)) {
@@ -38,9 +39,9 @@ public class MessageTools {
       }
 
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
-      return await TiaRestClient.FromHttpResponseAsync(response);
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
-      return TiaRestClient.FromException(ex);
+      return activity.Complete(TiaRestClient.FromException(ex));
     }
   }
 }

@@ -33,6 +33,8 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   public static class BlockRoutes {
     public const string List = "/api/blocks";
     public const string Get = "/api/blocks/get";
+    public const string Put = "/api/blocks/put";
+    public const string Patch = "/api/blocks/patch";
     public const string ExportCapabilities = "/api/blocks/export-capabilities";
   }
 
@@ -42,6 +44,7 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   public static class UDTRoutes {
     public const string List = "/api/udts";
     public const string Get = "/api/udts/get";
+    public const string Put = "/api/udts/put";
   }
 
   /// <summary>
@@ -57,6 +60,8 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   public static class TagTableRoutes {
     public const string List = "/api/tagtables";
     public const string Get = "/api/tagtables/get";
+    public const string Put = "/api/tagtables/put";
+    public const string Patch = "/api/tagtables/patch";
   }
 
   /// <summary>

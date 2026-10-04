@@ -1,3 +1,4 @@
+using ModelContextProtocol.Protocol;
 using System;
 using System.Net;
 using System.Net.Http;
@@ -9,6 +10,9 @@ namespace Tophinke.TiaOpenness.Tool.TiaMCP;
 
 public static class TiaRestClient {
   private static readonly HttpClient _client = new HttpClient {};
+  private static readonly JsonSerializerOptions _resultJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web) {
+    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+  };
 
   /// <summary>
   /// Konfiguriert den zentralen HttpClient einmalig beim Start.
@@ -22,57 +26,87 @@ public static class TiaRestClient {
   public static HttpClient Client => _client;
 
   /// <summary>
-  /// Maps a REST response to McpApiResponse. Error bodies are plain text from TiaREST
-  /// and must not be JSON-deserialized (that produced "'E' is an invalid start of a value").
+  /// Builds the folder filter query part ("&amp;path=A&amp;path=B"); empty if no folder is given.
   /// </summary>
-  public static async Task<McpApiResponse> FromHttpResponseAsync(HttpResponseMessage response) {
+  public static string PathQuery(string[]? path) {
+    if (path == null) {
+      return "";
+    }
+    return string.Concat(path.Where(p => !string.IsNullOrWhiteSpace(p)).Select(p => "&path=" + Uri.EscapeDataString(p.Trim())));
+  }
+
+  /// <summary>
+  /// Maps a REST response to a tool result with McpApiResponse as JSON content.
+  /// IsError is set when the REST call failed, so MCP clients see the failure without parsing the content.
+  /// Error bodies are plain text from TiaREST and must not be JSON-deserialized
+  /// (that produced "'E' is an invalid start of a value").
+  /// </summary>
+  public static async Task<CallToolResult> FromHttpResponseAsync(HttpResponseMessage response) {
     string body = await response.Content.ReadAsStringAsync();
     int statusCode = (int)response.StatusCode;
 
     if (!response.IsSuccessStatusCode) {
-      return new McpApiResponse {
+      return ToToolResult(new McpApiResponse {
         StatusCode = statusCode,
         IsSuccess = false,
         Error = string.IsNullOrWhiteSpace(body)
           ? (response.ReasonPhrase ?? ("HTTP " + statusCode))
           : body.Trim()
-      };
+      });
     }
 
     if (string.IsNullOrWhiteSpace(body)) {
-      return new McpApiResponse {
+      return ToToolResult(new McpApiResponse {
         StatusCode = statusCode,
         IsSuccess = true
-      };
+      });
     }
 
     try {
-      return new McpApiResponse {
+      return ToToolResult(new McpApiResponse {
         StatusCode = statusCode,
         IsSuccess = true,
         Data = JsonSerializer.Deserialize<JsonElement>(body)
-      };
+      });
     } catch (JsonException) {
-      return new McpApiResponse {
+      return ToToolResult(new McpApiResponse {
         StatusCode = statusCode,
         IsSuccess = false,
         Error = body.Trim()
-      };
+      });
     }
   }
 
-  public static McpApiResponse FromException(Exception ex) {
+  public static CallToolResult FromException(Exception ex) {
     if (ex is HttpRequestException) {
-      return new McpApiResponse {
+      return ToToolResult(new McpApiResponse {
         StatusCode = (int)HttpStatusCode.BadGateway,
         IsSuccess = false,
         Error = "The TIA Openness REST API is not running or is not reachable."
-      };
+      });
     }
-    return new McpApiResponse {
+    return ToToolResult(new McpApiResponse {
       StatusCode = (int)HttpStatusCode.InternalServerError,
       IsSuccess = false,
       Error = "An unexpected error occurred: " + ex.Message
+    });
+  }
+
+  /// <summary>
+  /// Tool result for invalid tool arguments that are rejected before calling the REST API.
+  /// </summary>
+  public static CallToolResult FromValidationError(string message) {
+    return ToToolResult(new McpApiResponse {
+      StatusCode = (int)HttpStatusCode.BadRequest,
+      IsSuccess = false,
+      Error = message
+    });
+  }
+
+  private static CallToolResult ToToolResult(McpApiResponse apiResponse) {
+    return new CallToolResult {
+      Content = [new TextContentBlock { Text = JsonSerializer.Serialize(apiResponse, _resultJsonOptions) }],
+      IsError = !apiResponse.IsSuccess
     };
   }
 }

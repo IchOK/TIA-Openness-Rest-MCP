@@ -20,6 +20,16 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     }
 
     /// <summary>
+    /// Erstellt das Import-Verzeichnis, falls es nicht existiert.
+    /// </summary>
+    /// <returns>Import-Verzeichnis</returns>
+    static public DirectoryInfo EnsureImportDirectory() {
+      string importRoot = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "import"));
+      Directory.CreateDirectory(importRoot);
+      return new DirectoryInfo(importRoot);
+    }
+
+    /// <summary>
     /// Bereinigt einen Dateinamen, indem ungültige Zeichen durch Unterstriche ersetzt werden.
     /// </summary>
     /// <param name="name">Dateiname</param>
@@ -58,19 +68,48 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// <param name="exportResult">Export-Ergebnis</param>
     /// <returns>Formatierte Export-Nachrichten</returns>
     static public string FormatExportMessages(DocumentExportResult exportResult) {
-      if (exportResult == null || exportResult.Messages == null) {
-        return exportResult != null ? exportResult.State.ToString() : null;
+      if (exportResult == null) {
+        return null;
       }
+      string[] parts = GetMessages(exportResult.Messages);
+      if (parts.Length == 0) {
+        return exportResult.State.ToString();
+      }
+      return string.Join("; ", parts);
+    }
+
+    /// <summary>
+    /// Formatierung der Import-Nachrichten.
+    /// </summary>
+    /// <param name="importResult">Import-Ergebnis</param>
+    /// <returns>Formatierte Import-Nachrichten</returns>
+    static public string FormatImportMessages(DocumentImportResult importResult) {
+      if (importResult == null) {
+        return null;
+      }
+      string[] parts = GetMessages(importResult.Messages);
+      if (parts.Length == 0) {
+        return importResult.State.ToString();
+      }
+      return string.Join("; ", parts);
+    }
+
+    /// <summary>
+    /// Liefert die nicht-leeren Meldungstexte eines Export- oder Import-Ergebnisses.
+    /// </summary>
+    /// <param name="messages">Meldungen des Ergebnisses</param>
+    /// <returns>Array mit den Meldungstexten</returns>
+    static public string[] GetMessages(DocumentResultMessageComposition messages) {
       var parts = new System.Collections.Generic.List<string>();
-      foreach (DocumentResultMessage message in exportResult.Messages) {
+      if (messages == null) {
+        return parts.ToArray();
+      }
+      foreach (DocumentResultMessage message in messages) {
         if (message != null && !string.IsNullOrWhiteSpace(message.Message)) {
           parts.Add(message.Message);
         }
       }
-      if (parts.Count == 0) {
-        return exportResult.State.ToString();
-      }
-      return string.Join("; ", parts);
+      return parts.ToArray();
     }
   }
 }

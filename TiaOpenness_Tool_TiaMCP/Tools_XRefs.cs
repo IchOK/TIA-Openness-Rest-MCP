@@ -1,3 +1,4 @@
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using System.ComponentModel;
 using Tophinke.TiaOpenness.Tool.Consts;
@@ -18,7 +19,7 @@ public class XRefTools {
     "References (array of referenced objects with Name, Path, Address, Device, TypeName, " +
     "and Locations: array of { Name, Address, TypeName, Access, ReferenceType, ReferenceLocation, ReferencedAsName } describing each usage site), " +
     "and Children (nested SourceInfo nodes for hierarchical results).")]
-  public static async Task<McpApiResponse> GetCrossReferences(
+  public static async Task<CallToolResult> GetCrossReferences(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the Device")] string deviceName,
@@ -26,15 +27,15 @@ public class XRefTools {
     [Description("The name of the object to look up (block, tag, UDT, or system constant name)")] string objectName,
     [Description("The kind of object. Allowed values: Block (FC/FB/OB/DB), Tag (PLC tag), Udt (user-defined type), SystemConstant")] string objectKind,
     [Description("Optional CrossReferenceFilter. Allowed values: AllObjects (default), ObjectsWithReferences, ObjectsWithoutReferences, UnusedObjects")] string filter = "AllObjects") {
+    var activity = ToolActivity.Start<XRefTools>($"Querverweise für {objectName} werden abgerufen");
     try {
-      Console.WriteLine("Querverweise werden abgerufen...");
       string safeProjectName = Uri.EscapeDataString(projectName);
       string route = $"{XRefRoutes.Get}?processId={processId}&projectName={safeProjectName}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&objectName={Uri.EscapeDataString(objectName)}&objectKind={Uri.EscapeDataString(objectKind)}&filter={Uri.EscapeDataString(filter ?? "AllObjects")}";
 
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
-      return await TiaRestClient.FromHttpResponseAsync(response);
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
-      return TiaRestClient.FromException(ex);
+      return activity.Complete(TiaRestClient.FromException(ex));
     }
   }
 }

@@ -95,6 +95,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaBlocks.GetAll(context);
           } else if (path == BlockRoutes.Get) {
             responseString = cTiaBlocks.Get(context);
+          } else if (path == BlockRoutes.Put) {
+            responseString = cTiaBlocks.Put(context);
+          } else if (path == BlockRoutes.Patch) {
+            responseString = cTiaBlocks.Patch(context);
           } else if (path == BlockRoutes.ExportCapabilities) {
             responseString = cTiaBlocks.ListExportCapabilities(context);
           }
@@ -104,6 +108,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaUDTs.List(context);
           } else if (path == UDTRoutes.Get) {
             responseString = cTiaUDTs.Get(context);
+          } else if (path == UDTRoutes.Put) {
+            responseString = cTiaUDTs.Put(context);
           }
 
           // Routen für Variablentabellen
@@ -111,6 +117,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaTagTables.List(context);
           } else if (path == TagTableRoutes.Get) {
             responseString = cTiaTagTables.Get(context);
+          } else if (path == TagTableRoutes.Put) {
+            responseString = cTiaTagTables.Put(context);
+          } else if (path == TagTableRoutes.Patch) {
+            responseString = cTiaTagTables.Patch(context);
           }
 
           // Routen für Querverweise
