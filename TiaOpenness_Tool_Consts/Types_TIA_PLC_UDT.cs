@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Tophinke.TiaOpenness.Tool.Types.UDT {
+namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
   /// <summary>
   /// Datentypen einer PLC-Software (Ergebnis der List-Funktion).
   /// </summary>

@@ -9,9 +9,10 @@ using Siemens.Engineering.SW.Types;
 using System;
 using System.Collections.Generic;
 using System.Net;
-using Tophinke.TiaOpenness.Tool.Types.XRef;
+using Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper;
+using Tophinke.TiaOpenness.Tool.Types.PLC.XRef;
 
-namespace Tophinke.TiaOpenness.Tool.TiaREST {
+namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
   static internal class cTiaXRefs {
     /// <summary>
     /// Gibt die Cross-References für ein Objekt in einem TIA-Projekt zurück.

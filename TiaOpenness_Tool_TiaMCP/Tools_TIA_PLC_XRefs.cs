@@ -3,7 +3,7 @@ using ModelContextProtocol.Server;
 using System.ComponentModel;
 using Tophinke.TiaOpenness.Tool.Consts;
 
-namespace Tophinke.TiaOpenness.Tool.TiaMCP;
+namespace Tophinke.TiaOpenness.Tool.TiaMCP.PLC;
 
 [McpServerToolType]
 public class XRefTools {

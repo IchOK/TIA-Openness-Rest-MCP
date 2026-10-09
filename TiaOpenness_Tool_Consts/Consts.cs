@@ -3,20 +3,12 @@
 namespace Tophinke.TiaOpenness.Tool.Consts
 {
   /// <summary>
-  /// Konstanten für Netzwerk- und API-Konfigurationen.
+  /// Protokoll-Konstanten der REST-API. Ports, API-Key und Versionen stehen in der appsettings.json der jeweiligen App.
   /// </summary>
   public static class Network
   {
-    /// <summary>
-    /// Port auf den die TIA REST API lauscht. Standardmäßig 6280.
-    /// </summary>
-    public const int TiaRestPort = 6280;
-    public const int TiaMcpPort = 6281;
     public const string TiaRestApiKeyHeader = "X-API-Key";
-    public const string TiaRestApiKeyDefault = "TiaOpennessDefaultToken";
-    public const string TiaVersionDefault = "20";
     public const string RouteHealth = "/api/health";
-
   }
 
   /// <summary>
@@ -33,8 +25,11 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   public static class BlockRoutes {
     public const string List = "/api/blocks";
     public const string Get = "/api/blocks/get";
+    public const string GetFile = "/api/blocks/getfile";
     public const string Put = "/api/blocks/put";
+    public const string PutFile = "/api/blocks/putfile";
     public const string Patch = "/api/blocks/patch";
+    public const string DiscardTypeVersion = "/api/blocks/discard-type-version";
     public const string ExportCapabilities = "/api/blocks/export-capabilities";
   }
 
@@ -45,6 +40,14 @@ namespace Tophinke.TiaOpenness.Tool.Consts
     public const string List = "/api/udts";
     public const string Get = "/api/udts/get";
     public const string Put = "/api/udts/put";
+  }
+
+  /// <summary>
+  /// Konstanten für die Übersetzen-Routen.
+  /// </summary>
+  public static class CompileRoutes {
+    public const string Item = "/api/compile/item";
+    public const string Plc = "/api/compile/plc";
   }
 
   /// <summary>

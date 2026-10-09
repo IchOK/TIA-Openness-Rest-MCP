@@ -5,7 +5,7 @@ using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Types;
 using System;
 
-namespace Tophinke.TiaOpenness.Tool.TiaREST {
+namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
   /// <summary>
   /// Gemeinsame rekursive Suche, die von mehreren REST-Handlern genutzt wird.
   /// </summary>

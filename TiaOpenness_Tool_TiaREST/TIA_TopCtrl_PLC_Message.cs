@@ -9,9 +9,9 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text.RegularExpressions;
-using Tophinke.TiaOpenness.Tool.Types.Message;
+using Tophinke.TiaOpenness.Tool.Types.TopCtrl.PLC.Message;
 
-namespace Tophinke.TiaOpenness.Tool.TiaREST {
+namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
   /// <summary>
   /// Sammelt Meldungen aus Meldekonfigurationen (tbMsg_ConfElement_T) in PLC-Datenbausteinen.
   /// </summary>

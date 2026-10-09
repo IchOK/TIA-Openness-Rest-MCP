@@ -1,6 +1,6 @@
 using System;
 
-namespace Tophinke.TiaOpenness.Tool.Types.Message {
+namespace Tophinke.TiaOpenness.Tool.Types.TopCtrl.PLC.Message {
   /// <summary>
   /// Eine gefundene Meldung aus einer Meldekonfiguration (tbMsg_ConfElement_T).
   /// </summary>

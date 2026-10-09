@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Tophinke.TiaOpenness.Tool.Types.PLC.Library;
 
-namespace Tophinke.TiaOpenness.Tool.Types.Block {
+namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
   /// <summary>
   /// Bausteine einer PLC-Software (Ergebnis der List-Funktion).
   /// </summary>
@@ -19,6 +20,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.Block {
     public string BlockType { get; set; }      // z. B. "GlobalDB"
     public string ProgrammingLanguage { get; set; } // z. B. "LAD", "SCL", "DB"
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
+    public LibraryInfo Library { get; set; }   // null = keine Instanz eines Bibliothekstyps
   }
 
   public class  Data {
@@ -33,9 +35,22 @@ namespace Tophinke.TiaOpenness.Tool.Types.Block {
     public string BlockType { get; set; }      // z. B. "GlobalDB"
     public string ProgrammingLanguage { get; set; } // z. B. "LAD", "SCL", "DB"
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
+    public LibraryInfo Library { get; set; }   // null = keine Instanz eines Bibliothekstyps
     public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"
     public string Content { get; set; }
     public string MultiLingualText { get; set; } 
+  }
+
+  /// <summary>
+  /// Ergebnis des Exports eines Bausteins in Dateien (GetFile).
+  /// </summary>
+  public class FileData : Info {
+    public string DeviceName { get; set; }
+    public string DeviceItemName { get; set; }
+    public string PlcName { get; set; }
+    public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"
+    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string[] Files { get; set; }        // vollständige Pfade der exportierten Dateien
   }
 
   /// <summary>
@@ -47,6 +62,10 @@ namespace Tophinke.TiaOpenness.Tool.Types.Block {
     public string Content { get; set; }        // .s7dcl- oder SimaticML-Inhalt
     public string MultiLingualText { get; set; } // optionaler .s7res-Inhalt (nur SD)
     public int? BlockNumber { get; set; }      // gewünschte Nummer; null = bisherige Nummer bzw. automatisch
+    public string LibraryMode { get; set; }    // nur für Instanzen von Bibliothekstypen: "InTest" oder "Release"; leer = ablehnen
+    public string LibraryVersion { get; set; } // Versionsnummer für "Release", z. B. "0.1.37"; leer = Nummer der In-Test-Version
+    public string LibraryAuthor { get; set; }  // Autor für "Release"; leer = Autor der bisherigen Version
+    public string LibraryComment { get; set; } // Kommentar für "Release"
   }
 
   /// <summary>
@@ -59,6 +78,39 @@ namespace Tophinke.TiaOpenness.Tool.Types.Block {
     public bool Created { get; set; }          // true = neu angelegt, false = überschrieben
     public string Format { get; set; }
     public string[] Messages { get; set; }     // Meldungen des TIA-Imports
+  }
+
+  /// <summary>
+  /// Request-Body für das Anlegen oder Überschreiben eines Bausteins aus Dateien (PUT).
+  /// Die Dateien werden aus Root\Projekt\Ordnerpfad gelesen.
+  /// </summary>
+  public class PutFileRequest {
+    public string RootDirectory { get; set; }  // absoluter Pfad des Wurzelverzeichnisses
+    public string[] Path { get; set; }         // Zielordner; null = bisheriger Ordner bzw. Wurzelordner
+    public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"; leer = aus den vorhandenen Dateien ableiten
+    public int? BlockNumber { get; set; }      // gewünschte Nummer; null = bisherige Nummer bzw. automatisch
+    public string LibraryMode { get; set; }    // nur für Instanzen von Bibliothekstypen: "InTest" oder "Release"; leer = ablehnen
+    public string LibraryVersion { get; set; } // Versionsnummer für "Release", z. B. "0.1.37"; leer = Nummer der In-Test-Version
+    public string LibraryAuthor { get; set; }  // Autor für "Release"; leer = Autor der bisherigen Version
+    public string LibraryComment { get; set; } // Kommentar für "Release"
+  }
+
+  /// <summary>
+  /// Ergebnis des Verwerfens der In-Test-Version eines Bibliothekstyps.
+  /// </summary>
+  public class DiscardTypeVersionResult : Info {
+    public string DeviceName { get; set; }
+    public string DeviceItemName { get; set; }
+    public string PlcName { get; set; }
+    public string DiscardedVersion { get; set; } // verworfene In-Test-Version
+  }
+
+  /// <summary>
+  /// Ergebnis des Anlegens oder Überschreibens eines Bausteins aus Dateien (PUT).
+  /// </summary>
+  public class PutFileResult : PutResult {
+    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string[] Files { get; set; }        // vollständige Pfade der importierten Dateien
   }
 
   /// <summary>

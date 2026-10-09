@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Tophinke.TiaOpenness.Tool.Types.TagTable {
+namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
   /// <summary>
   /// Tagtabellen einer PLC-Software (Ergebnis der List-Funktion).
   /// </summary>

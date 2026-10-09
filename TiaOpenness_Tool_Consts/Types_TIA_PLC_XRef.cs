@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace Tophinke.TiaOpenness.Tool.Types.XRef {
+namespace Tophinke.TiaOpenness.Tool.Types.PLC.XRef {
   public class LocationInfo {
     public string Access { get; set; }
     public string ReferenceType { get; set; }

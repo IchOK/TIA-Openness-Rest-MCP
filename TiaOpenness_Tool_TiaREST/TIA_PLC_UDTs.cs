@@ -15,10 +15,11 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using Tophinke.TiaOpenness.Tool.Consts;
-using Tophinke.TiaOpenness.Tool.Types.UDT;
-using static Tophinke.TiaOpenness.Tool.TiaREST.cTiaRequestHelpers;
+using Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper;
+using Tophinke.TiaOpenness.Tool.Types.PLC.UDT;
+using static Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper.cTiaRequestHelpers;
 
-namespace Tophinke.TiaOpenness.Tool.TiaREST {
+namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
   static internal class cTiaUDTs {
     /// <summary>
     /// Gibt die Liste der Datentypen (UDTs) in einem TIA-Projekt zurück.
@@ -351,7 +352,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// Ermittelt den Ordnerpfad eines Datentyps innerhalb der Datentyp-Ordner.
     /// </summary>
     /// <returns>Namen der Benutzerordner vom Wurzelordner bis zum Datentyp; leer, wenn der Datentyp im Wurzelordner liegt</returns>
-    static private string[] GetTypePath(PlcType type) {
+    static internal string[] GetTypePath(PlcType type) {
       var path = new List<string>();
       IEngineeringObject current = type.Parent;
       while (current != null && !(current is PlcTypeSystemGroup)) {

@@ -3,7 +3,7 @@ using ModelContextProtocol.Server;
 using System.ComponentModel;
 using Tophinke.TiaOpenness.Tool.Consts;
 
-namespace Tophinke.TiaOpenness.Tool.TiaMCP;
+namespace Tophinke.TiaOpenness.Tool.TiaMCP.TopCtrl.PLC;
 
 [McpServerToolType]
 public class MessageTools {

@@ -9,10 +9,11 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using Tophinke.TiaOpenness.Tool.Consts;
-using Tophinke.TiaOpenness.Tool.Types.TagTable;
-using static Tophinke.TiaOpenness.Tool.TiaREST.cTiaRequestHelpers;
+using Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper;
+using Tophinke.TiaOpenness.Tool.Types.PLC.TagTable;
+using static Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper.cTiaRequestHelpers;
 
-namespace Tophinke.TiaOpenness.Tool.TiaREST {
+namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
   static internal class cTiaTagTables {
     private const string KindTag = "Tag";
     private const string KindUserConstant = "UserConstant";

@@ -8,7 +8,7 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Tophinke.TiaOpenness.Tool.TiaREST {
+namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
   /// <summary>
   /// Gemeinsame Hilfsmethoden für schreibende REST-Handler (PUT/PATCH).
   /// </summary>

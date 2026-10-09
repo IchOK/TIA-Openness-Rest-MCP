@@ -4,9 +4,9 @@ using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using Tophinke.TiaOpenness.Tool.Consts;
-using Tophinke.TiaOpenness.Tool.Types.UDT;
+using Tophinke.TiaOpenness.Tool.Types.PLC.UDT;
 
-namespace Tophinke.TiaOpenness.Tool.TiaMCP;
+namespace Tophinke.TiaOpenness.Tool.TiaMCP.PLC;
 
 [McpServerToolType]
 public class UDTTools {

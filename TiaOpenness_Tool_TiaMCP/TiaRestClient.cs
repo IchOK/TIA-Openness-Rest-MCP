@@ -9,7 +9,8 @@ using Tophinke.TiaOpenness.Tool.Consts;
 namespace Tophinke.TiaOpenness.Tool.TiaMCP;
 
 public static class TiaRestClient {
-  private static readonly HttpClient _client = new HttpClient {};
+  private static readonly HttpClient _client = new HttpClient();
+  private static readonly HttpClient _longRunningClient = new HttpClient();
   private static readonly JsonSerializerOptions _resultJsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web) {
     DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
   };
@@ -17,13 +18,22 @@ public static class TiaRestClient {
   /// <summary>
   /// Konfiguriert den zentralen HttpClient einmalig beim Start.
   /// </summary>
-  public static void Initialize(string apiKey, string restPort) {
-    _client.BaseAddress = new Uri($"http://localhost:{restPort}");
-    _client.DefaultRequestHeaders.Remove("X-API-Key");
-    _client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+  public static void Initialize(string apiKey, string restHost, int restPort, int timeoutSeconds, int longRunningTimeoutMinutes) {
+    _client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
+    _longRunningClient.Timeout = TimeSpan.FromMinutes(longRunningTimeoutMinutes);
+    foreach (HttpClient client in new[] { _client, _longRunningClient }) {
+      client.BaseAddress = new Uri($"http://{restHost}:{restPort}");
+      client.DefaultRequestHeaders.Remove("X-API-Key");
+      client.DefaultRequestHeaders.Add("X-API-Key", apiKey);
+    }
   }
 
   public static HttpClient Client => _client;
+
+  /// <summary>
+  /// Client for calls that can take several minutes, e.g. compiling a whole PLC.
+  /// </summary>
+  public static HttpClient LongRunningClient => _longRunningClient;
 
   /// <summary>
   /// Builds the folder filter query part ("&amp;path=A&amp;path=B"); empty if no folder is given.

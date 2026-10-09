@@ -48,3 +48,9 @@ Thumbs.db
 # ==========================================
 # Falls du TIA-Archive oder Export-Dateien im Projektordner hast:
 export/
+
+# ==========================================
+# 7. Installer-Build
+# ==========================================
+installer/stage/
+installer/output/

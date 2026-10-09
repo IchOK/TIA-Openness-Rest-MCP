@@ -12,57 +12,34 @@ using System.Reflection;
 using System.Text;
 using Tophinke.TiaOpenness.Tool.Consts;
 using Tophinke.TiaOpenness.Tool.TiaREST;
+using Tophinke.TiaOpenness.Tool.TiaREST.PLC;
+using Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
   class Program {
-    static string tiaVersion = Network.TiaVersionDefault;
-    static string defaultApiKey = Network.TiaRestApiKeyDefault;
-
-    static void Main(string[] args) {
-      // Prüfen ob globale Parameter definert wurden
-      if (args.Length > 0) {
-        for (int i = 0; i < args.Length; i++) {
-          if (args[i] == "-v" || args[i] == "--version") {
-            if (i + 1 < args.Length) {
-              tiaVersion = args[i + 1];
-              Console.WriteLine($"TIA Version gesetzt: {tiaVersion}");
-            }
-          }
-        }
+    static int Main(string[] args) {
+      RestSettings settings;
+      try {
+        settings = RestSettings.Load(args);
+      } catch (InvalidOperationException ex) {
+        Console.Error.WriteLine($"Error: {ex.Message}");
+        return 1;
       }
+      Console.WriteLine($"TIA Version: {settings.TiaVersion}, Siemens path: {settings.SiemensPath}");
 
       AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+#if DEBUG
       // Sync Openness firewall entry before any TIA attach (needs admin / elevated process).
-      OpennessWhitelist.TryUpdate(tiaVersion);
-      RunServer(args);
+      OpennessWhitelist.TryUpdate(settings.TiaVersion);
+#endif
+      RunServer(settings);
+      return 0;
     }
 
-    private static void RunServer(string[] args) {
-      // Standardwerte für den REST-Server
-      int restPort = Network.TiaRestPort;
-      string apiKey = "";
-      if (args.Length > 0) {
-        for (int i = 0; i < args.Length; i++) {
-          if (args[i] == "-k" || args[i] == "--key" || args[i] == "--apikey") {
-            if (i + 1 < args.Length) {
-              apiKey = args[i + 1];
-            }
-          }
-          if (args[i] == "-p" || args[i] == "--port") {
-            if (i + 1 < args.Length) {
-              restPort = int.Parse(args[i + 1]);
-            }
-          }
-        }
-      }
-      if (apiKey == "") {
-        apiKey = defaultApiKey;
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine("ACHTUNG: REST-Server läuft mit Default-Key");
-        Console.ResetColor();
-      }
-
-      string url = $"http://localhost:{restPort}/";
+    private static void RunServer(RestSettings settings) {
+      string apiKey = settings.ApiKey;
+      string tiaVersion = settings.TiaVersion;
+      string url = $"http://{settings.Host}:{settings.Port}/";
       HttpListener listener = new HttpListener();
       listener.Prefixes.Add(url);
       listener.Start();
@@ -95,10 +72,16 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaBlocks.GetAll(context);
           } else if (path == BlockRoutes.Get) {
             responseString = cTiaBlocks.Get(context);
+          } else if (path == BlockRoutes.GetFile) {
+            responseString = cTiaBlocks.GetFile(context);
           } else if (path == BlockRoutes.Put) {
             responseString = cTiaBlocks.Put(context);
+          } else if (path == BlockRoutes.PutFile) {
+            responseString = cTiaBlocks.PutFile(context);
           } else if (path == BlockRoutes.Patch) {
             responseString = cTiaBlocks.Patch(context);
+          } else if (path == BlockRoutes.DiscardTypeVersion) {
+            responseString = cTiaBlocks.DiscardTypeVersion(context);
           } else if (path == BlockRoutes.ExportCapabilities) {
             responseString = cTiaBlocks.ListExportCapabilities(context);
           }
@@ -110,6 +93,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
             responseString = cTiaUDTs.Get(context);
           } else if (path == UDTRoutes.Put) {
             responseString = cTiaUDTs.Put(context);
+          }
+
+          // Routen für das Übersetzen
+          else if (path == CompileRoutes.Item) {
+            responseString = cTiaCompile.Item(context);
+          } else if (path == CompileRoutes.Plc) {
+            responseString = cTiaCompile.Plc(context);
           }
 
           // Routen für Variablentabellen
@@ -155,17 +145,18 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
 
     private static Assembly CurrentDomain_AssemblyResolve(object sender, ResolveEventArgs args) {
       var assemblyName = new AssemblyName(args.Name);
+      string tiaVersion = RestSettings.Current.TiaVersion;
+      // PublicAPI der installierten TIA Portal Version: <SiemensPath>\Portal V<Version>\PublicAPI\V<Version>[.AddIn]
+      string publicApi = Path.Combine(RestSettings.Current.SiemensPath, $"Portal V{tiaVersion}", "PublicAPI");
       if (assemblyName.Name.StartsWith("Siemens.Engineering.AddIn")) {
-        // Pfad zur offiziellen PublicAPI der installierten TIA Portal Version (hier V20)
-        string path = $@"C:\Program Files\Siemens\Automation\Portal V{tiaVersion}\PublicAPI\V{tiaVersion}.AddIn\{assemblyName.Name}.dll";
+        string path = Path.Combine(publicApi, $"V{tiaVersion}.AddIn", assemblyName.Name + ".dll");
 
         if (File.Exists(path)) {
           return Assembly.LoadFrom(path);
         }
       }
       if (assemblyName.Name.StartsWith("Siemens.Engineering")) {
-        // Pfad zur offiziellen PublicAPI der installierten TIA Portal Version (hier V20)
-        string path = $@"C:\Program Files\Siemens\Automation\Portal V{tiaVersion}\PublicAPI\V{tiaVersion}\{assemblyName.Name}.dll";
+        string path = Path.Combine(publicApi, $"V{tiaVersion}", assemblyName.Name + ".dll");
 
         if (File.Exists(path)) {
           return Assembly.LoadFrom(path);

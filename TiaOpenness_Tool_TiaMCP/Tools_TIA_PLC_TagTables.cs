@@ -4,9 +4,9 @@ using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using Tophinke.TiaOpenness.Tool.Consts;
-using Tophinke.TiaOpenness.Tool.Types.TagTable;
+using Tophinke.TiaOpenness.Tool.Types.PLC.TagTable;
 
-namespace Tophinke.TiaOpenness.Tool.TiaMCP;
+namespace Tophinke.TiaOpenness.Tool.TiaMCP.PLC;
 
 [McpServerToolType]
 public class TagTableTools {

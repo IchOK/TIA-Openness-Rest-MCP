@@ -2,46 +2,23 @@ using System.Net;
 using Tophinke.TiaOpenness.Tool.Consts;
 using Tophinke.TiaOpenness.Tool.TiaMCP;
 
-var switchMappings = new Dictionary<string, string>
-{
-    { "-k", "apiKey" },
-    { "--key", "apiKey" },
-    { "--apikey", "apiKey" },
-    { "-p", "port" },
-    { "--port", "port" },
-    { "-pr", "restport" },
-    { "--restport", "restport" },
-    { "-v", "version" },
-    { "--version", "version" },
-    { "--restpath", "restpath" }
-};
+// appsettings.json liegt neben der Anwendung; das Arbeitsverzeichnis kann beim Start durch einen MCP-Client beliebig sein.
+// Die Argumente gehen nur an AddCommandLine mit Mappings, weil der Standard-Parser unbekannte Kurzschalter (-k) ablehnt.
+var builder = WebApplication.CreateBuilder(new WebApplicationOptions { ContentRootPath = AppContext.BaseDirectory });
+builder.Configuration.AddCommandLine(args, McpSettings.SwitchMappings);
 
-var builder = WebApplication.CreateBuilder(args);
-builder.Configuration.AddCommandLine(args, switchMappings);
-
-// API-Key aus den Parametern verwenden, sondt mit Default-KEY starten
-string? configuredApiKey = builder.Configuration["apiKey"];
-bool usesDefaultApiKey = string.IsNullOrWhiteSpace(configuredApiKey);
-string apiKey = usesDefaultApiKey ? Network.TiaRestApiKeyDefault : configuredApiKey!;
-string? portStr = builder.Configuration["port"];
-if (string.IsNullOrWhiteSpace(portStr)) {
-  portStr = Network.TiaMcpPort.ToString();
+McpSettings settings;
+try {
+  settings = McpSettings.Load(builder.Configuration);
+} catch (InvalidOperationException ex) {
+  Console.Error.WriteLine($"Error: {ex.Message}");
+  return 1;
 }
-string? restPortStr = builder.Configuration["restport"];
-if (string.IsNullOrWhiteSpace(restPortStr)) {
-  restPortStr = Network.TiaRestPort.ToString();
-}
-string? restPath = builder.Configuration["restpath"];
-if (string.IsNullOrWhiteSpace(restPath)) {
-  restPath = "c:\\Users\\TopAdmin\\source\\repos\\Tophinke-IT\\TiaOpenness_Tools\\TiaOpenness_Tool_TiaREST\\bin\\Debug\\TiaOpenness_Tool_TiaREST.exe";
-}
-string? tiaVersion = builder.Configuration["version"];
-if (string.IsNullOrWhiteSpace(tiaVersion)) {
-  tiaVersion = Network.TiaVersionDefault;
-}
+string apiKey = settings.ApiKey;
+string restPath = TiaRestManager.ResolveRestExePath(settings.RestPath);
 
 // REST-Client initialisieren
-TiaRestClient.Initialize(apiKey, restPortStr);
+TiaRestClient.Initialize(apiKey, settings.RestHost, settings.RestPort, settings.RestTimeoutSeconds, settings.LongRunningTimeoutMinutes);
 
 // MCP Server registrieren und Tools laden
 builder.Services.AddMcpServer()
@@ -52,12 +29,9 @@ var app = builder.Build();
 
 // Logger für statische Tools und Hilfsklassen; Level und Format kommen aus appsettings (Logging)
 AppLog.Initialize(app.Services.GetRequiredService<ILoggerFactory>());
-if (usesDefaultApiKey) {
-  app.Logger.LogWarning("ACHTUNG: MCP-Server läuft mit Default-Key");
-}
 
 // REST-API-App starten, falls sie nicht läuft
-await TiaRestManager.EnsureSidecarIsRunningAsync(restPath, apiKey, restPortStr, tiaVersion);
+await TiaRestManager.EnsureSidecarIsRunningAsync(restPath, apiKey, settings.RestPort, settings.RestStartTimeoutSeconds);
 
 // Middleware: accept X-API-Key (Cursor) or Authorization: Bearer (Hermes / OAuth-style clients)
 app.Use(async (context, next) => {
@@ -73,7 +47,8 @@ app.Use(async (context, next) => {
 });
 
 app.MapMcp("/mcp");
-app.Run($"http://0.0.0.0:{portStr}");
+app.Run($"http://{settings.BindAddress}:{settings.Port}");
+return 0;
 
 static bool IsAuthorized(HttpRequest request, string expectedApiKey) {
   if (request.Headers.TryGetValue(Network.TiaRestApiKeyHeader, out var apiKeyHeader)
