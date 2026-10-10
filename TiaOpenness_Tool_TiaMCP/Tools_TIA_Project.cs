@@ -7,7 +7,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaMCP;
 
 [McpServerToolType]
 public class ProjectTools {
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_projects_list"), Description(
     "Returns a list of all currently open TIA Portal projects and their Process IDs. " +
     "Call this first to obtain processId and projectName for other tools. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +

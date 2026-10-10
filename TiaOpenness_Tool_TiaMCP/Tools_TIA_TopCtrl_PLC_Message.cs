@@ -7,7 +7,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaMCP.TopCtrl.PLC;
 
 [McpServerToolType]
 public class MessageTools {
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_topctrl_plc_messages_list"), Description(
     "DEPRECATED / UNDER DEVELOPMENT: Do NOT use this tool. It is currently under active development and unstable." +
     "Collects all relevant PLC messages (Meldungen) from a TIA project. " +
     "Scans data blocks for configurations of type tbMsg_ConfElement_T and returns entries where xSelect start value is true. " +

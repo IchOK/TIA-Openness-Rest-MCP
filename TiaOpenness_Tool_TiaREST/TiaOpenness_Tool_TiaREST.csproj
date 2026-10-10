@@ -12,6 +12,7 @@
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);1573;1591</NoWarn>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -19,6 +20,8 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
+    <!-- Die XML-Dokumentation liefert die Beschreibungen für /help und muss neben der Exe liegen. -->
+    <DocumentationFile>bin\Debug\TiaOpenness_Tool_TiaREST.xml</DocumentationFile>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -28,6 +31,7 @@
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
+    <DocumentationFile>bin\Release\TiaOpenness_Tool_TiaREST.xml</DocumentationFile>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -51,10 +55,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="RestHelp.cs" />
+    <Compile Include="RestRouter.cs" />
     <Compile Include="RestSettings.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="OpennessWhitelist.cs" Condition=" '$(Configuration)' == 'Debug' " />
     <Compile Include="TIA_PLC_Helper_Export.cs" />
+    <Compile Include="TIA_PLC_Helper_FileBatch.cs" />
     <Compile Include="TIA_PLC_Helper_Find.cs" />
     <Compile Include="TIA_PLC_Helper_Library.cs" />
     <Compile Include="TIA_PLC_Helper_Request.cs" />

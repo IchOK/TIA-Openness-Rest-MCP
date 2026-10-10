@@ -15,6 +15,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
     public Version VersionNumber;    // nur Release; null = Nummer der In-Test-Version
     public string Author;            // nur Release; null = Autor der bisherigen Version
     public string Comment;           // nur Release
+    public bool OnlyInstances;       // true: Mode gilt nur für Instanzen von Bibliothekstypen, andere Objekte werden normal importiert
+
+    /// <summary>
+    /// Liefert den für ein Objekt wirksamen Modus.
+    /// </summary>
+    public string ModeFor(LibraryTypeInstanceInfo instanceInfo) {
+      return OnlyInstances && instanceInfo == null ? cTiaLibraryHelpers.ModeNone : Mode;
+    }
   }
 
   /// <summary>
@@ -64,6 +72,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
         Comment = comment
       };
       return null;
+    }
+
+    /// <summary>
+    /// Optionen für den Import ganzer Verzeichnisse: Instanzen von Bibliothekstypen werden als In-Test-Version
+    /// in ihren Typ geschrieben, alle anderen Objekte normal importiert.
+    /// </summary>
+    static public LibraryWriteOptions InTestForInstances() {
+      return new LibraryWriteOptions { Mode = ModeInTest, OnlyInstances = true };
     }
 
     /// <summary>

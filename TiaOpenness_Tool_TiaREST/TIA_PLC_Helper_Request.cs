@@ -27,18 +27,6 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
     }
 
     /// <summary>
-    /// Prüft die HTTP-Methode der Anfrage.
-    /// </summary>
-    /// <returns>Fehlermeldung (Antwort ist bereits gesetzt) oder null, wenn die Methode passt</returns>
-    static public string RequireMethod(HttpListenerContext context, string method, string route) {
-      if (string.Equals(context.Request.HttpMethod, method, StringComparison.OrdinalIgnoreCase)) {
-        return null;
-      }
-      context.Response.AddHeader("Allow", method);
-      return ErrorResponse(context, HttpStatusCode.MethodNotAllowed, $"Error: Route {route} requires HTTP {method}.");
-    }
-
-    /// <summary>
     /// Liest den JSON-Body der Anfrage (UTF-8) und deserialisiert ihn.
     /// </summary>
     static public T ReadBody<T>(HttpListenerContext context) {

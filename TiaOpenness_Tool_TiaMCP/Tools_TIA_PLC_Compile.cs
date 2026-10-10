@@ -14,18 +14,18 @@ public class CompileTools {
     "On success, Data is a JSON object with: " +
     "DeviceName, DeviceItemName, PlcName, " +
     "Target (\"Block\", \"UDT\" or \"PLC\"), Name (block/UDT name or PLC name), " +
-    "Path (folder of the block/UDT, as in ListBlocks/ListUdts; omitted for PLC), " +
+    "Path (folder of the block/UDT, as in tia_plc_blocks_list/tia_plc_udts_list; omitted for PLC), " +
     "State (\"Success\", \"Information\", \"Warning\" or \"Error\"), ErrorCount, WarningCount, " +
     "Messages (errors and warnings only, each with: " +
     "Location (string array of the compiler message tree from the PLC down to the message, " +
     "e.g. [\"PLC_1\", \"Program blocks\", \"Plant\", \"Main (OB1)\", \"12\"]: PLC, block folders, block with type and number, position), " +
     "BlockName (block the message belongs to, taken from Location; omitted for general messages), " +
     "State (\"Error\" or \"Warning\"), Description (message text of TIA Portal)). " +
-    "For SCL blocks the last Location element is the line number in the SCL code; in the .s7dcl text (Content of GetBlock, file of GetBlockFile) " +
+    "For SCL blocks the last Location element is the line number in the SCL code; in the .s7dcl text (Content of tia_plc_blocks_get, file of tia_plc_blocks_get_file) " +
     "this is the line of the 'NETWORK' keyword plus that number (e.g. NETWORK in line 354 and position 75 = .s7dcl line 429). " +
-    "Typical fix loop: compile, read the affected block (GetBlock/GetBlockFile) or UDT (GetUdt), fix it, write it back (PutBlock/PutBlockFile/PutUdt), compile again.";
+    "Typical fix loop: compile, read the affected block (tia_plc_blocks_get/tia_plc_blocks_get_file) or UDT (tia_plc_udts_get), fix it, write it back (tia_plc_blocks_put/tia_plc_blocks_put_file/tia_plc_udts_put), compile again.";
 
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_plc_compile_item"), Description(
     "Compiles a single PLC block (FC, FB, OB, DB, …) or PLC data type (UDT) and returns the compile errors and warnings. " +
     "TIA Portal also compiles objects the item depends on if needed; their messages are included. " +
     "A block that is already consistent (unchanged since its last compile) is not compiled again, so its warnings are not repeated. " +
@@ -53,7 +53,7 @@ public class CompileTools {
     }
   }
 
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_plc_compile_plc"), Description(
     "Compiles the software of a PLC (\"Compile > Software (only changes)\" in TIA Portal) and returns the compile errors and warnings. " +
     "All inconsistent (changed or affected) UDTs and blocks are compiled, so every compile error of the program is reported; " +
     "warnings of blocks that were already compiled before are not repeated. " +

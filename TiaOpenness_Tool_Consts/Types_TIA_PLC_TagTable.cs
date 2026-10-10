@@ -88,6 +88,56 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
   }
 
   /// <summary>
+  /// Ergebnis des Exports einer Variablentabelle in eine Datei (GetFile, immer SimaticML/XML).
+  /// </summary>
+  public class FileData : Info {
+    public string DeviceName { get; set; }
+    public string DeviceItemName { get; set; }
+    public string PlcName { get; set; }
+    public string Format { get; set; }         // "SimaticML/XML"
+    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string[] Files { get; set; }        // vollständiger Pfad der exportierten Datei
+  }
+
+  /// <summary>
+  /// Request-Body für das Anlegen oder Überschreiben einer Variablentabelle aus einer XML-Datei (PUT).
+  /// </summary>
+  public class PutFileRequest {
+    public string RootDirectory { get; set; }  // absoluter Pfad des Wurzelverzeichnisses
+    public string[] Path { get; set; }         // Dateiordner und Zielordner für neue Tabellen; null = bisheriger Ordner bzw. Wurzelordner
+  }
+
+  /// <summary>
+  /// Ergebnis des Imports einer Variablentabelle aus einer XML-Datei (PUT).
+  /// </summary>
+  public class PutFileResult : Info {
+    public string DeviceName { get; set; }
+    public string DeviceItemName { get; set; }
+    public string PlcName { get; set; }
+    public bool Created { get; set; }          // true = Tabelle neu angelegt
+    public string Format { get; set; }         // "SimaticML/XML"
+    public string[] Messages { get; set; }
+    public string Directory { get; set; }
+    public string[] Files { get; set; }
+  }
+
+  /// <summary>
+  /// Eine Variablentabelle eines Imports aus mehreren Dateien (PutFileList); Felder wie bei PutFile.
+  /// </summary>
+  public class PutFileListItem {
+    public string TagTableName { get; set; }
+    public string[] Path { get; set; }
+  }
+
+  /// <summary>
+  /// Request-Body für den Import mehrerer Variablentabellen aus XML-Dateien (PutFileList).
+  /// </summary>
+  public class PutFileListRequest {
+    public string RootDirectory { get; set; }
+    public List<PutFileListItem> Items { get; set; }
+  }
+
+  /// <summary>
   /// Ergebnis des Änderns einzelner Variablen und Konstanten (PATCH).
   /// </summary>
   public class PatchResult {

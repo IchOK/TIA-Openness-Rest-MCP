@@ -9,6 +9,7 @@ using Siemens.Engineering.SW.Types;
 using System;
 using System.Collections.Generic;
 using System.Net;
+using Tophinke.TiaOpenness.Tool.Consts;
 using Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper;
 using Tophinke.TiaOpenness.Tool.Types.PLC.XRef;
 
@@ -18,15 +19,17 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Gibt die Cross-References für ein Objekt in einem TIA-Projekt zurück.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <query name="objectName">Name des Objekts</query>
-    /// <query name="objectKind">Art des Objekts</query>
-    /// <query name="tagName">Name des Tags innerhalb der Datenbausteins</query>
-    /// <query name="filterStr">Filter für die Cross-References</query>
+    /// <query name="objectKind">Art des Objekts: Block, DbTag, Tag, UDT oder SystemConstant</query>
+    /// <query name="tagName">Name des Tags innerhalb des Datenbausteins (nur bei objectKind DbTag)</query>
+    /// <query name="refType">Optional: nur Verweise dieser Art, z. B. Uses, UsedBy, Assigns, Defines, DefinedBy, InstanceType, TypeInstance</query>
+    /// <query name="filter">Optional: AllObjects (Standard), ObjectsWithReferences, ObjectsWithoutReferences oder UnusedObjects</query>
     /// <returns>JSON-String mit den Cross-References oder Fehlermeldung</returns>
+    [RestRoute(XRefRoutes.Get)]
     static public string Get(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];

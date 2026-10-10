@@ -28,19 +28,15 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Übersetzt einen einzelnen PLC-Baustein oder Datentyp (HTTP POST).
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="name">Name des Bausteins oder Datentyps</query>
     /// <query name="itemType">Optional "Block" oder "UDT"; ohne Angabe wird zuerst ein Baustein, dann ein Datentyp gesucht</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <returns>JSON-String mit CompileResult oder Fehlermeldung</returns>
+    [RestRoute(CompileRoutes.Item, "POST")]
     static public string Item(HttpListenerContext context) {
-      string methodError = RequireMethod(context, "POST", CompileRoutes.Item);
-      if (methodError != null) {
-        return methodError;
-      }
-
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       string name = context.Request.QueryString["name"];
@@ -119,17 +115,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Openness bietet kein "Software (alle Bausteine neu übersetzen)", und ein konsistenter Baustein wird auch einzeln nicht neu übersetzt.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <returns>JSON-String mit CompileResult oder Fehlermeldung</returns>
+    [RestRoute(CompileRoutes.Plc, "POST")]
     static public string Plc(HttpListenerContext context) {
-      string methodError = RequireMethod(context, "POST", CompileRoutes.Plc);
-      if (methodError != null) {
-        return methodError;
-      }
-
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       string deviceName = context.Request.QueryString["deviceName"];

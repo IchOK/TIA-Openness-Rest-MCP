@@ -15,15 +15,15 @@ public class BlockTools {
     "State \"Committed\" = released and write-protected or \"InWork\" = in-test version being edited)";
 
   private const string LibraryWriteDescription =
-    "Instances of project library types (Library is set in ListBlocks/GetBlock) cannot be overwritten by a plain import: " +
+    "Instances of project library types (Library is set in tia_plc_blocks_list/tia_plc_blocks_get) cannot be overwritten by a plain import: " +
     "without libraryMode the call is rejected with StatusCode 409 and nothing is changed. " +
     "libraryMode \"InTest\" writes the content into the library type as in-test version: a released version is first opened for editing " +
     "(this block becomes the test instance), an existing in-test version is overwritten; the block must stay in its folder. " +
     "libraryMode \"Release\" additionally releases that version (optional libraryVersion e.g. \"0.1.37\", default = number of the in-test version; " +
     "libraryAuthor, libraryComment); dependent types are not released automatically, and a failed release leaves the content in the in-test version. " +
-    "Use DiscardBlockTypeVersion to throw away an in-test version. Other instances of the type in the project are not updated. ";
+    "Use tia_plc_blocks_discard_type_version to throw away an in-test version. Other instances of the type in the project are not updated. ";
 
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_plc_blocks_list"), Description(
     "Returns a list of all PLC blocks of a specific TIA project. " +
     "Optionally filter with the comma-separated Openness type names in filterTypes (exact match on BlockType). " +
     "Allowed filter strings and their meaning: " +
@@ -42,11 +42,11 @@ public class BlockTools {
     "All filters can be combined. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON array with one object per PLC: " +
-    "DeviceName (device / station name, required for GetBlock), " +
-    "DeviceItemName (CPU / device item name, required for GetBlock), " +
+    "DeviceName (device / station name, required for tia_plc_blocks_get), " +
+    "DeviceItemName (CPU / device item name, required for tia_plc_blocks_get), " +
     "PlcName (PLC software name), " +
     "Blocks (array of the PLC's blocks, each with: " +
-    "BlockName (block name, required for GetBlock), " +
+    "BlockName (block name, required for tia_plc_blocks_get), " +
     "BlockNumber (block number in the PLC), " +
     "BlockType (Openness type name such as FC, FB, OB, GlobalDB, …), " +
     "ProgrammingLanguage (e.g. LAD, SCL, FBD, STL, DB), " +
@@ -88,9 +88,9 @@ public class BlockTools {
     }
   }
 
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_plc_blocks_get"), Description(
     "Returns the content of a PLC block (FC, FB, OB, GlobalDB, InstanceDB, …). " +
-    "Use DeviceName, DeviceItemName and BlockName from ListBlocks. " +
+    "Use DeviceName, DeviceItemName and BlockName from tia_plc_blocks_list. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON object with: " +
     "DeviceName (device / station name), " +
@@ -108,7 +108,7 @@ public class BlockTools {
     "Content references them by ID, e.g. { S7_MLC := \"MLC_3SC\" }, and MultiLingualText holds the texts per ID and language " +
     "(YAML: \"MultiLingualTexts:\" followed by entries \"- id: MLC_3SC\" and \"de-DE: <text>\"). " +
     "null for \"SimaticML/XML\" (texts are inside the XML) or if the block has no such texts). " +
-    "To write the block back with PutBlock, pass Format and MultiLingualText exactly as returned here together with the (modified) Content.")]
+    "To write the block back with tia_plc_blocks_put, pass Format and MultiLingualText exactly as returned here together with the (modified) Content.")]
   public static async Task<CallToolResult> GetBlock(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
@@ -127,12 +127,12 @@ public class BlockTools {
     }
   }
 
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_plc_blocks_put"), Description(
     "Creates a new PLC block or overwrites an existing block with the same name (FC, FB, OB, GlobalDB, …). " +
-    "Content, Format and MultiLingualText correspond to the fields of the same name returned by GetBlock. " +
-    "Typical workflow: GetBlock, modify Content (and MultiLingualText if needed), then PutBlock with the same Format and MultiLingualText. " +
+    "Content, Format and MultiLingualText correspond to the fields of the same name returned by tia_plc_blocks_get. " +
+    "Typical workflow: tia_plc_blocks_get, modify Content (and MultiLingualText if needed), then tia_plc_blocks_put with the same Format and MultiLingualText. " +
     "Format \"SimaticData/SD\": Content is the .s7dcl text; multilingual comments are referenced by ID, e.g. { S7_MLC := \"MLC_3SC\" }, " +
-    "and MultiLingualText (the .s7res text from GetBlock) must contain an entry \"- id: <ID>\" with the texts per language for every referenced ID. " +
+    "and MultiLingualText (the .s7res text from tia_plc_blocks_get) must contain an entry \"- id: <ID>\" with the texts per language for every referenced ID. " +
     "When adding a new comment, add a new unique ID in Content and a matching entry in MultiLingualText. " +
     "MultiLingualText may be null only if Content references no IDs. " +
     "Format \"SimaticML/XML\": Content is the XML text including all texts; MultiLingualText must be null. " +
@@ -157,9 +157,9 @@ public class BlockTools {
     [Description("The name of the block")] string blockName,
     [Description("The name of the Device")] string deviceName,
     [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Complete block text in the given format (Content from GetBlock, modified as needed)")] string content,
-    [Description("MultiLingualText from GetBlock (.s7res text with the texts for all S7_MLC IDs in Content); required for \"SimaticData/SD\" if Content references IDs, otherwise null; must be null for \"SimaticML/XML\"")] string? multiLingualText,
-    [Description("Format from GetBlock: \"SimaticData/SD\" or \"SimaticML/XML\"")] string format,
+    [Description("Complete block text in the given format (Content from tia_plc_blocks_get, modified as needed)")] string content,
+    [Description("MultiLingualText from tia_plc_blocks_get (.s7res text with the texts for all S7_MLC IDs in Content); required for \"SimaticData/SD\" if Content references IDs, otherwise null; must be null for \"SimaticML/XML\"")] string? multiLingualText,
+    [Description("Format from tia_plc_blocks_get: \"SimaticData/SD\" or \"SimaticML/XML\"")] string format,
     [Description("Optional target folder as user group names from the root, e.g. [\"Plant\", \"Unit1\"]; empty array = root folder")] string[]? path = null,
     [Description("Optional block number; omit to keep the number of an existing block or to let TIA assign one for a new block")] int? blockNumber = null,
     [Description("Only for instances of library types: \"InTest\" (write as in-test version) or \"Release\" (write and release); omit for normal blocks")] string? libraryMode = null,
@@ -167,7 +167,7 @@ public class BlockTools {
     [Description("Only with libraryMode \"Release\": author of the released version; omit to keep the author of the version")] string? libraryAuthor = null,
     [Description("Only with libraryMode \"Release\": comment of the released version")] string? libraryComment = null) {
     if (string.IsNullOrWhiteSpace(format)) {
-      return TiaRestClient.FromValidationError("Error: format is required: \"SimaticData/SD\" or \"SimaticML/XML\" (use Format from GetBlock).");
+      return TiaRestClient.FromValidationError("Error: format is required: \"SimaticData/SD\" or \"SimaticML/XML\" (use Format from tia_plc_blocks_get).");
     }
     var activity = ToolActivity.Start<BlockTools>($"Baustein {blockName} wird geschrieben");
     try {
@@ -193,15 +193,15 @@ public class BlockTools {
     }
   }
 
-  [McpServerTool, Description(
-    "Exports a PLC block to files instead of returning its content (same block selection as GetBlock). " +
+  [McpServerTool(Name = "tia_plc_blocks_get_file"), Description(
+    "Exports a PLC block to files instead of returning its content (same block selection as tia_plc_blocks_get). " +
     "The files are written to <rootDirectory>\\<project name>\\<block folder path>\\, mirroring the block folders of the project " +
     "(invalid file name characters in project and folder names are replaced by '_'); missing directories are created. " +
     "Files: <BlockName>.s7dcl plus <BlockName>.s7res (if the block has multilingual texts) for Format \"SimaticData/SD\" (LAD, FBD, SCL, DB incl. F-variants), " +
     "or <BlockName>.xml for Format \"SimaticML/XML\" (all other languages such as STL or GRAPH). " +
     "Existing .s7dcl/.s7res/.xml files of the block in that directory are replaced. " +
     "rootDirectory is a path on the machine running TIA Portal and the REST API. " +
-    "Use PutBlockFile with the same rootDirectory to import the (edited) files again. " +
+    "Use tia_plc_blocks_put_file with the same rootDirectory to import the (edited) files again. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON object with: " +
     "DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, ProgrammingLanguage, " +
@@ -229,9 +229,9 @@ public class BlockTools {
     }
   }
 
-  [McpServerTool, Description(
-    "Creates a new PLC block or overwrites an existing block with the same name from files (same behavior as PutBlock, but without passing the content). " +
-    "The files are read from <rootDirectory>\\<project name>\\<folder path>\\, the layout written by GetBlockFile; " +
+  [McpServerTool(Name = "tia_plc_blocks_put_file"), Description(
+    "Creates a new PLC block or overwrites an existing block with the same name from files (same behavior as tia_plc_blocks_put, but without passing the content). " +
+    "The files are read from <rootDirectory>\\<project name>\\<folder path>\\, the layout written by tia_plc_blocks_get_file; " +
     "<folder path> is Path if given, otherwise the current folder of an existing block, otherwise the root folder. " +
     "Expected files: <BlockName>.s7dcl plus optional <BlockName>.s7res for Format \"SimaticData/SD\", or <BlockName>.xml for Format \"SimaticML/XML\". " +
     "If format is omitted, it is derived from the existing files (.s7dcl = SimaticData/SD, .xml = SimaticML/XML); if both exist, format is required. " +
@@ -288,8 +288,150 @@ public class BlockTools {
     }
   }
 
-  [McpServerTool, Description(
-    "Discards the in-test version of the project library type a PLC block is an instance of (e.g. after PutBlock/PutBlockFile with libraryMode \"InTest\"). " +
+  [McpServerTool(Name = "tia_plc_blocks_get_dir"), Description(
+    "Exports all PLC blocks of a block folder to files, like tia_plc_blocks_get_file for every block; uses a single TIA session, so it is much faster than many single calls. " +
+    "path selects the block folder (folder names from the block group root; omit for the root folder, i.e. the whole PLC), " +
+    "recursive (default true) includes all subfolders. " +
+    "Each block is written to <rootDirectory>\\<project name>\\<block folder path>\\ as <BlockName>.s7dcl (+ .s7res) or <BlockName>.xml, replacing existing files of the block; " +
+    "other files in the directories are not touched. Know-how-protected blocks are skipped. " +
+    "UDTs and tag tables exported with tia_plc_udts_get_dir/tia_plc_tagtables_get_dir go to the same directory tree when their folders have the same names; the Put*Dir tools tell the kinds apart by file content. " +
+    "Use tia_plc_blocks_put_dir or tia_plc_blocks_put_file_list with the same rootDirectory to import the (edited) files again. " +
+    "Each item: DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, ProgrammingLanguage, Path, " + LibraryInfoDescription + ", Format, Directory, Files. " +
+    TiaRestClient.BatchResultDescription)]
+  public static async Task<CallToolResult> GetBlockDir(
+    [Description("The ProcessId of the TIA Portal instance")] int processId,
+    [Description("The name of the project")] string projectName,
+    [Description("The name of the Device")] string deviceName,
+    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"; files go to <rootDirectory>\\<project name>\\<block folder path>")] string rootDirectory,
+    [Description("Optional block folder as folder names from the root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; omit for the root folder")] string[]? path = null,
+    [Description("Include subfolders (default true)")] bool recursive = true) {
+    var activity = ToolActivity.Start<BlockTools>("Bausteine eines Ordners werden in Dateien exportiert");
+    try {
+      string route = $"{BlockRoutes.GetDir}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}&recursive={recursive}"
+        + TiaRestClient.PathQuery(path);
+
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.GetAsync(route);
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
+    } catch (Exception ex) {
+      return activity.Complete(TiaRestClient.FromException(ex));
+    }
+  }
+
+  [McpServerTool(Name = "tia_plc_blocks_get_file_list"), Description(
+    "Exports several PLC blocks to files, exactly like tia_plc_blocks_get_file for each name in blockNames, in a single TIA session. " +
+    "Each block is written to <rootDirectory>\\<project name>\\<block folder path>\\. " +
+    "Each item: DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, ProgrammingLanguage, Path, " + LibraryInfoDescription + ", Format, Directory, Files. " +
+    TiaRestClient.BatchResultDescription)]
+  public static async Task<CallToolResult> GetBlockFileList(
+    [Description("The ProcessId of the TIA Portal instance")] int processId,
+    [Description("The name of the project")] string projectName,
+    [Description("The name of the Device")] string deviceName,
+    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
+    [Description("Names of the blocks to export")] string[] blockNames) {
+    if (blockNames == null || blockNames.All(string.IsNullOrWhiteSpace)) {
+      return TiaRestClient.FromValidationError("Error: blockNames must contain at least one block name.");
+    }
+    var activity = ToolActivity.Start<BlockTools>($"{blockNames.Length} Bausteine werden in Dateien exportiert");
+    try {
+      string route = $"{BlockRoutes.GetFileList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}"
+        + TiaRestClient.RepeatedQuery("blockName", blockNames);
+
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.GetAsync(route);
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
+    } catch (Exception ex) {
+      return activity.Complete(TiaRestClient.FromException(ex));
+    }
+  }
+
+  [McpServerTool(Name = "tia_plc_blocks_put_dir"), Description(
+    "Imports all block files of a directory, like tia_plc_blocks_put_file for every file, in a single TIA session. " +
+    "Reads <rootDirectory>\\<project name>\\<path>\\ and, with recursive (default true), all subdirectories; " +
+    "every <Name>.s7dcl (+ optional <Name>.s7res) or <Name>.xml whose content is a block is imported as block <Name> " +
+    "into the project folder that matches its directory (subdirectory names = folder names; missing folders are created, existing blocks in other folders are moved). " +
+    "Files of UDTs and tag tables, and files whose content is not recognized, are listed in Skipped. " +
+    "If <Name>.s7dcl and <Name>.xml both exist, format selects one; without format that block is reported in Errors. " +
+    "Existing blocks keep their block number. Instances of project library types are written as in-test version of their type " +
+    "(a released version is opened for editing as a new in-test version, an existing in-test version is overwritten; nothing is released; " +
+    "use tia_plc_blocks_discard_type_version to throw an in-test version away). " +
+    "Blocks whose import fails in TIA are retried after the others, so dependencies between the files do not depend on the file order. " +
+    "Nothing is compiled; use tia_plc_compile_plc afterwards. The files are not changed or deleted. " +
+    "Each item: same fields as tia_plc_blocks_put_file returns. " +
+    TiaRestClient.BatchResultDescription)]
+  public static async Task<CallToolResult> PutBlockDir(
+    [Description("The ProcessId of the TIA Portal instance")] int processId,
+    [Description("The name of the project")] string projectName,
+    [Description("The name of the Device")] string deviceName,
+    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("Absolute root directory of the files, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<path>")] string rootDirectory,
+    [Description("Optional folder as names from the root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; selects the start directory and the matching project folder; omit for the root")] string[]? path = null,
+    [Description("Include subdirectories (default true)")] bool recursive = true,
+    [Description("Only needed if <Name>.s7dcl and <Name>.xml both exist: \"SimaticData/SD\" or \"SimaticML/XML\"")] string? format = null) {
+    var activity = ToolActivity.Start<BlockTools>("Bausteine eines Verzeichnisses werden importiert");
+    try {
+      string route = $"{BlockRoutes.PutDir}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
+
+      var body = new Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch.PutDirRequest {
+        RootDirectory = rootDirectory,
+        Path = path,
+        Recursive = recursive,
+        Format = format
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PutAsync(route, httpContent);
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
+    } catch (Exception ex) {
+      return activity.Complete(TiaRestClient.FromException(ex));
+    }
+  }
+
+  [McpServerTool(Name = "tia_plc_blocks_put_file_list"), Description(
+    "Imports several PLC blocks from files, exactly like tia_plc_blocks_put_file for each entry in items, in a single TIA session. " +
+    "Each entry has BlockName and optional Path, Format and BlockNumber with the same meaning as in tia_plc_blocks_put_file " +
+    "(files are read from <rootDirectory>\\<project name>\\<Path or current folder of the block>\\). " +
+    "The library options apply to every instance of a library type in the list; without libraryMode such blocks fail with StatusCode 409. " +
+    LibraryWriteDescription +
+    "Blocks whose import fails in TIA are retried after the others, so the order of the entries does not matter for dependencies. " +
+    "Nothing is compiled. The files are not changed or deleted. " +
+    "Each item: same fields as tia_plc_blocks_put_file returns. " +
+    TiaRestClient.BatchResultDescription)]
+  public static async Task<CallToolResult> PutBlockFileList(
+    [Description("The ProcessId of the TIA Portal instance")] int processId,
+    [Description("The name of the project")] string projectName,
+    [Description("The name of the Device")] string deviceName,
+    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("Absolute root directory of the files, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
+    [Description("Blocks to import: BlockName (required), Path (optional folder names; selects file subdirectory and target folder), Format (optional), BlockNumber (optional)")] PutFileListItem[] items,
+    [Description("Only for instances of library types: \"InTest\" or \"Release\"; omit for normal blocks")] string? libraryMode = null,
+    [Description("Only with libraryMode \"Release\": version number to release, e.g. \"0.1.37\"")] string? libraryVersion = null,
+    [Description("Only with libraryMode \"Release\": author of the released versions")] string? libraryAuthor = null,
+    [Description("Only with libraryMode \"Release\": comment of the released versions")] string? libraryComment = null) {
+    if (items == null || items.Length == 0) {
+      return TiaRestClient.FromValidationError("Error: items must contain at least one block.");
+    }
+    var activity = ToolActivity.Start<BlockTools>($"{items.Length} Bausteine werden aus Dateien importiert");
+    try {
+      string route = $"{BlockRoutes.PutFileList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
+
+      var body = new PutFileListRequest {
+        RootDirectory = rootDirectory,
+        Items = items.ToList(),
+        LibraryMode = libraryMode,
+        LibraryVersion = libraryVersion,
+        LibraryAuthor = libraryAuthor,
+        LibraryComment = libraryComment
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PutAsync(route, httpContent);
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
+    } catch (Exception ex) {
+      return activity.Complete(TiaRestClient.FromException(ex));
+    }
+  }
+
+  [McpServerTool(Name = "tia_plc_blocks_discard_type_version"), Description(
+    "Discards the in-test version of the project library type a PLC block is an instance of (e.g. after tia_plc_blocks_put/tia_plc_blocks_put_file with libraryMode \"InTest\"). " +
     "The instances fall back to the last released version; all changes of the in-test version are lost. " +
     "Fails with StatusCode 400 if the block is not a library type instance and 409 if its version is already released. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
@@ -316,7 +458,7 @@ public class BlockTools {
     }
   }
 
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_plc_blocks_patch"), Description(
     "Changes only the start values of variables in a data block (GlobalDB, InstanceDB, ArrayDB); the block structure stays unchanged. " +
     "Member is the variable path inside the data block: structs/UDTs with dots, array elements with brackets, nesting allowed, " +
     "e.g. \"Speed\", \"Motor.Scale.Min\", \"Motor.Diag[2]\", \"Matrix[1,2]\" or \"Motor.Params[1].Scale.Mins[1].Value\". " +
@@ -326,7 +468,7 @@ public class BlockTools {
     "On success, Data is a JSON object with: " +
     "DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, " +
     "Changes (array of objects with Member, OldValue, NewValue and Error; Error is null if the value was set). " +
-    "If some values could not be set, IsSuccess is false and Error contains the same JSON object.")]
+    "If some values could not be set, IsSuccess is false, Error is a short summary and Data still contains the same JSON object.")]
   public static async Task<CallToolResult> PatchBlockStartValues(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
@@ -350,7 +492,7 @@ public class BlockTools {
     }
   }
 
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_plc_blocks_list_export_capabilities"), Description(
     "Probes export support per ProgrammingLanguage found in a TIA project. " +
     "Walks all blocks, picks one non-know-how-protected sample per ProgrammingLanguage, " +
     "and tries ExportAsDocuments (SIMATIC SD) and Simatic ML XML export. " +
@@ -365,7 +507,7 @@ public class BlockTools {
     var activity = ToolActivity.Start<BlockTools>("Export-Fähigkeiten werden geprüft");
     try {
       string safeProjectName = Uri.EscapeDataString(projectName);
-      string route = $"{BlockRoutes.ExportCapabilities}?processId={processId}&projectName={safeProjectName}";
+      string route = $"{BlockRoutes.ListExportCapabilities}?processId={processId}&projectName={safeProjectName}";
 
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));

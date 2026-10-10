@@ -9,68 +9,89 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   {
     public const string TiaRestApiKeyHeader = "X-API-Key";
     public const string RouteHealth = "/api/health";
+    public const string RouteHelp = "/help";
   }
+
+  // Routen-Schema: /api/<bereich>/<funktion>; der MCP-Toolname ist derselbe Pfad mit "tia" statt "/api"
+  // und "_" statt "/" bzw. "-" (z. B. /api/plc/blocks/get-file = tia_plc_blocks_get_file).
 
   /// <summary>
   /// Konstanten für die Projekt-Routen.
   /// </summary>
   public static class ProjectRoutes
   {
-    public const string List = "/api/projects";
+    public const string List = "/api/projects/list";
   }
 
   /// <summary>
   /// Konstanten für die Block-Routen (DB, FB, FC, OB, …).
   /// </summary>
   public static class BlockRoutes {
-    public const string List = "/api/blocks";
-    public const string Get = "/api/blocks/get";
-    public const string GetFile = "/api/blocks/getfile";
-    public const string Put = "/api/blocks/put";
-    public const string PutFile = "/api/blocks/putfile";
-    public const string Patch = "/api/blocks/patch";
-    public const string DiscardTypeVersion = "/api/blocks/discard-type-version";
-    public const string ExportCapabilities = "/api/blocks/export-capabilities";
+    public const string List = "/api/plc/blocks/list";
+    public const string Get = "/api/plc/blocks/get";
+    public const string GetFile = "/api/plc/blocks/get-file";
+    public const string Put = "/api/plc/blocks/put";
+    public const string PutFile = "/api/plc/blocks/put-file";
+    public const string GetDir = "/api/plc/blocks/get-dir";
+    public const string PutDir = "/api/plc/blocks/put-dir";
+    public const string GetFileList = "/api/plc/blocks/get-file-list";
+    public const string PutFileList = "/api/plc/blocks/put-file-list";
+    public const string Patch = "/api/plc/blocks/patch";
+    public const string DiscardTypeVersion = "/api/plc/blocks/discard-type-version";
+    public const string ListExportCapabilities = "/api/plc/blocks/list-export-capabilities";
   }
 
   /// <summary>
   /// Konstanten für die UDT-Routen.
   /// </summary>
   public static class UDTRoutes {
-    public const string List = "/api/udts";
-    public const string Get = "/api/udts/get";
-    public const string Put = "/api/udts/put";
+    public const string List = "/api/plc/udts/list";
+    public const string Get = "/api/plc/udts/get";
+    public const string Put = "/api/plc/udts/put";
+    public const string GetFile = "/api/plc/udts/get-file";
+    public const string PutFile = "/api/plc/udts/put-file";
+    public const string GetDir = "/api/plc/udts/get-dir";
+    public const string PutDir = "/api/plc/udts/put-dir";
+    public const string GetFileList = "/api/plc/udts/get-file-list";
+    public const string PutFileList = "/api/plc/udts/put-file-list";
+    public const string DiscardTypeVersion = "/api/plc/udts/discard-type-version";
   }
 
   /// <summary>
   /// Konstanten für die Übersetzen-Routen.
   /// </summary>
   public static class CompileRoutes {
-    public const string Item = "/api/compile/item";
-    public const string Plc = "/api/compile/plc";
+    public const string Item = "/api/plc/compile/item";
+    public const string Plc = "/api/plc/compile/plc";
   }
 
   /// <summary>
   /// Konstanten für die Querverweis-Routen.
   /// </summary>
   public static class XRefRoutes {
-    public const string Get = "/api/xrefs";
+    public const string Get = "/api/plc/xrefs/get";
   }
 
   /// <summary>
   /// Konstanten für die Variablentabellen-Routen.
   /// </summary>
   public static class TagTableRoutes {
-    public const string List = "/api/tagtables";
-    public const string Get = "/api/tagtables/get";
-    public const string Put = "/api/tagtables/put";
-    public const string Patch = "/api/tagtables/patch";
+    public const string List = "/api/plc/tagtables/list";
+    public const string Get = "/api/plc/tagtables/get";
+    public const string Put = "/api/plc/tagtables/put";
+    public const string Patch = "/api/plc/tagtables/patch";
+    public const string GetFile = "/api/plc/tagtables/get-file";
+    public const string PutFile = "/api/plc/tagtables/put-file";
+    public const string GetDir = "/api/plc/tagtables/get-dir";
+    public const string PutDir = "/api/plc/tagtables/put-dir";
+    public const string GetFileList = "/api/plc/tagtables/get-file-list";
+    public const string PutFileList = "/api/plc/tagtables/put-file-list";
   }
 
   /// <summary>
   /// Konstanten für die Melde-/Message-Routen.
   /// </summary>
   public static class MessageRoutes {
-    public const string List = "/api/messages";
+    public const string List = "/api/topctrl/plc/messages/list";
   }
 }

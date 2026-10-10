@@ -14,6 +14,7 @@ using System.Net;
 using System.Runtime.Remoting.Contexts;
 using System.Text;
 using System.Threading.Tasks;
+using Tophinke.TiaOpenness.Tool.Consts;
 using Tophinke.TiaOpenness.Tool.Types.Project;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST {
@@ -112,6 +113,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <returns>JSON-String mit der Liste der offenen TIA Portal Instanzen und deren Projekte oder Fehlermeldung</returns>
+    [RestRoute(ProjectRoutes.List)]
     static public string List(HttpListenerContext context) {
       var processes = TiaPortal.GetProcesses();
       var projectInfos = new List<Info>();

@@ -34,7 +34,7 @@ Write-Host "== REST-API (Release)"
 dotnet msbuild "$root\TiaOpenness_Tool_TiaREST\TiaOpenness_Tool_TiaREST.csproj" /p:Configuration=Release /t:Rebuild /v:m -nologo
 if ($LASTEXITCODE -ne 0) { throw "REST build failed." }
 Get-ChildItem "$root\TiaOpenness_Tool_TiaREST\bin\Release" -File |
-  Where-Object { $_.Extension -in ".exe", ".dll", ".config", ".json" } |
+  Where-Object { $_.Extension -in ".exe", ".dll", ".config", ".json" -or $_.Name -eq "TiaOpenness_Tool_TiaREST.xml" } |
   Copy-Item -Destination $restStage
 
 Write-Host "== MCP-Server (Release, self-contained win-x64)"

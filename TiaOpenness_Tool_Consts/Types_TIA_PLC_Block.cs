@@ -96,6 +96,29 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
   }
 
   /// <summary>
+  /// Ein Baustein eines Imports aus mehreren Dateien (PutFileList); Felder wie bei PutFile.
+  /// </summary>
+  public class PutFileListItem {
+    public string BlockName { get; set; }
+    public string[] Path { get; set; }         // Ordner; null = bisheriger Ordner bzw. Wurzelordner
+    public string Format { get; set; }         // leer = aus den vorhandenen Dateien ableiten
+    public int? BlockNumber { get; set; }      // null = bisherige Nummer bzw. automatisch
+  }
+
+  /// <summary>
+  /// Request-Body für den Import mehrerer Bausteine aus Dateien (PutFileList).
+  /// Die Bibliotheksoptionen gelten für alle Instanzen von Bibliothekstypen in der Liste.
+  /// </summary>
+  public class PutFileListRequest {
+    public string RootDirectory { get; set; }
+    public List<PutFileListItem> Items { get; set; }
+    public string LibraryMode { get; set; }
+    public string LibraryVersion { get; set; }
+    public string LibraryAuthor { get; set; }
+    public string LibraryComment { get; set; }
+  }
+
+  /// <summary>
   /// Ergebnis des Verwerfens der In-Test-Version eines Bibliothekstyps.
   /// </summary>
   public class DiscardTypeVersionResult : Info {

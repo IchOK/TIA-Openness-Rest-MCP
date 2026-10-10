@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Tophinke.TiaOpenness.Tool.Types.PLC.Library;
 
 namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
   /// <summary>
@@ -16,6 +17,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
   public class Info {
     public string UdtName { get; set; }
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
+    public LibraryInfo Library { get; set; }   // null = keine Instanz eines Bibliothekstyps
   }
 
   public class  Data {
@@ -27,9 +29,22 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
     public string PlcName { get; set; }
     public string UdtName { get; set; }
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
+    public LibraryInfo Library { get; set; }   // null = keine Instanz eines Bibliothekstyps
     public string Format { get; set; }
     public string Content { get; set; }
     public string MultiLingualText { get; set; }
+  }
+
+  /// <summary>
+  /// Ergebnis des Exports eines Datentyps in Dateien (GetFile).
+  /// </summary>
+  public class FileData : Info {
+    public string DeviceName { get; set; }
+    public string DeviceItemName { get; set; }
+    public string PlcName { get; set; }
+    public string Format { get; set; }
+    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string[] Files { get; set; }        // vollständige Pfade der exportierten Dateien
   }
 
   /// <summary>
@@ -40,6 +55,10 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
     public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"; leer = aus Content ableiten
     public string Content { get; set; }        // .s7dcl- oder SimaticML-Inhalt
     public string MultiLingualText { get; set; } // optionaler .s7res-Inhalt (nur SD)
+    public string LibraryMode { get; set; }    // nur für Instanzen von Bibliothekstypen: "InTest" oder "Release"; leer = ablehnen
+    public string LibraryVersion { get; set; } // Versionsnummer für "Release"; leer = Nummer der In-Test-Version
+    public string LibraryAuthor { get; set; }  // Autor für "Release"; leer = Autor der bisherigen Version
+    public string LibraryComment { get; set; } // Kommentar für "Release"
   }
 
   /// <summary>
@@ -53,5 +72,57 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
     public string Format { get; set; }
     public string[] Messages { get; set; }     // Meldungen des TIA-Imports
   }
-}
 
+  /// <summary>
+  /// Request-Body für das Anlegen oder Überschreiben eines Datentyps aus Dateien (PUT).
+  /// Die Dateien werden aus Root\Projekt\Ordnerpfad gelesen.
+  /// </summary>
+  public class PutFileRequest {
+    public string RootDirectory { get; set; }  // absoluter Pfad des Wurzelverzeichnisses
+    public string[] Path { get; set; }         // Dateiordner und Zielordner für neue UDTs; null = bisheriger Ordner bzw. Wurzelordner
+    public string Format { get; set; }         // leer = aus den vorhandenen Dateien ableiten
+    public string LibraryMode { get; set; }
+    public string LibraryVersion { get; set; }
+    public string LibraryAuthor { get; set; }
+    public string LibraryComment { get; set; }
+  }
+
+  /// <summary>
+  /// Ergebnis des Verwerfens der In-Test-Version eines Bibliothekstyps.
+  /// </summary>
+  public class DiscardTypeVersionResult : Info {
+    public string DeviceName { get; set; }
+    public string DeviceItemName { get; set; }
+    public string PlcName { get; set; }
+    public string DiscardedVersion { get; set; } // verworfene In-Test-Version
+  }
+
+  /// <summary>
+  /// Ergebnis des Anlegens oder Überschreibens eines Datentyps aus Dateien (PUT).
+  /// </summary>
+  public class PutFileResult : PutResult {
+    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string[] Files { get; set; }        // vollständige Pfade der importierten Dateien
+  }
+
+  /// <summary>
+  /// Ein Datentyp eines Imports aus mehreren Dateien (PutFileList); Felder wie bei PutFile.
+  /// </summary>
+  public class PutFileListItem {
+    public string UdtName { get; set; }
+    public string[] Path { get; set; }
+    public string Format { get; set; }
+  }
+
+  /// <summary>
+  /// Request-Body für den Import mehrerer Datentypen aus Dateien (PutFileList).
+  /// </summary>
+  public class PutFileListRequest {
+    public string RootDirectory { get; set; }
+    public List<PutFileListItem> Items { get; set; }
+    public string LibraryMode { get; set; }
+    public string LibraryVersion { get; set; }
+    public string LibraryAuthor { get; set; }
+    public string LibraryComment { get; set; }
+  }
+}

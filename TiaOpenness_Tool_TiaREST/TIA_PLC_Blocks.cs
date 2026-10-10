@@ -15,6 +15,7 @@ using System.Text;
 using Tophinke.TiaOpenness.Tool.Consts;
 using Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper;
 using Tophinke.TiaOpenness.Tool.Types.PLC.Block;
+using Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch;
 using static Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper.cTiaRequestHelpers;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
@@ -26,12 +27,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Gibt die Liste aller PLC-Bausteine in einem TIA-Projekt zurück.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="filterTypes">Optionaler kommagetrennter Filter für die Bausteintypen (z. B. "FC,GlobalDB")</query>
     /// <query name="filterLanguages">Optionaler kommagetrennter Filter für die Programmiersprachen (z. B. "SCL,LAD")</query>
     /// <query name="path">Optionaler Ordnerfilter, ein Parameter je Ordnername (path=A&amp;path=B); liefert die Bausteine dieses Ordners inkl. Unterordnern</query>
     /// <returns>JSON-String mit der Liste der PLC-Bausteine je PLC oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.List)]
     static public string GetAll(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -92,12 +94,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Gibt den PLC-Baustein mit dem angegebenen Namen in einem TIA-Projekt zurück.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="blockName">Name des PLC-Bausteins</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <returns>JSON-String mit dem PLC-Baustein als SD-Dokument oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.Get)]
     static public string Get(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -168,19 +171,15 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Legt einen PLC-Baustein neu an oder überschreibt einen bestehenden Baustein (HTTP PUT).
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="blockName">Name des PLC-Bausteins</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <body>PutRequest mit Content (SD oder XML), optional Format, MultiLingualText und Path</body>
     /// <returns>JSON-String mit PutResult oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.Put, "PUT")]
     static public string Put(HttpListenerContext context) {
-      string methodError = RequireMethod(context, "PUT", BlockRoutes.Put);
-      if (methodError != null) {
-        return methodError;
-      }
-
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       string blockName = context.Request.QueryString["blockName"];
@@ -220,10 +219,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         MultiLingualText = request.MultiLingualText
       };
       return ImportBlock(context, processIdStr, projectName, deviceName, deviceItemName, blockName, request.Path, request.BlockNumber, library,
-        (Project project, string[] targetPath, out ImportSource loaded) => {
-          loaded = source;
-          return null;
-        });
+        (project, targetPath) => ItemResult<ImportSource>.Ok(source));
     }
 
     /// <summary>
@@ -231,13 +227,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Vorhandene Dateien des Bausteins (.s7dcl, .s7res, .xml) werden ersetzt.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="blockName">Name des PLC-Bausteins</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
     /// <returns>JSON-String mit FileData (inkl. Pfaden der exportierten Dateien) oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.GetFile)]
     static public string GetFile(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -251,59 +248,108 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
       }
 
-      try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
-          var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
-          if (errorMessage != null) {
-            return ErrorResponse(context, HttpStatusCode.NotFound, errorMessage);
-          }
+      return cTiaFileBatchHelpers.ExecuteItem(context, processIdStr, projectName, project => {
+        var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
+        if (errorMessage != null) {
+          return ItemResult<FileData>.Fail(HttpStatusCode.NotFound, errorMessage);
+        }
+        return ExportBlockFiles(project, plcSoftware, plcBlockGroup, deviceName, deviceItemName, blockName, fullRoot);
+      });
+    }
 
-          PlcBlock block = cTiaFindHelpers.FindBlock(plcBlockGroup, blockName);
-          if (block == null) {
-            return ErrorResponse(context, HttpStatusCode.NotFound, $"Error: Block with name {blockName} not found in PLC software {plcSoftware.Name}.");
-          }
-
-          string[] blockPath = GetBlockPath(block);
-          errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, project.Name, blockPath, out string directory);
-          if (errorMessage != null) {
-            return ErrorResponse(context, HttpStatusCode.BadRequest, errorMessage);
-          }
-
-          errorMessage = ExportToDirectory(block, blockName, directory, out string format, out string[] files);
-          if (errorMessage != null) {
-            return ErrorResponse(context, HttpStatusCode.InternalServerError, errorMessage);
-          }
-
-          var data = new FileData {
-            DeviceName = deviceName,
-            DeviceItemName = deviceItemName,
-            PlcName = plcSoftware.Name,
-            BlockName = block.Name,
-            BlockNumber = block.Number,
-            BlockType = block.GetType().Name,
-            ProgrammingLanguage = block.ProgrammingLanguage.ToString(),
-            Path = blockPath,
-            Library = cTiaLibraryHelpers.GetLibraryInfo(block),
-            Format = format,
-            Directory = directory,
-            Files = files
-          };
-
-          context.Response.ContentType = "application/json";
-          return JsonConvert.SerializeObject(data);
-        });
-        return retValue;
-      } catch (Siemens.Engineering.EngineeringObjectDisposedException ex) {
-        Console.Error.WriteLine($"TIA session disposed: {ex.Message}");
-        context.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
-        context.Response.ContentType = "text/plain";
-        return "Error: TIA session unavailable. Please re-open TIA Portal.";
-      } catch (Exception ex) {
-        Console.Error.WriteLine($"Error accessing TIA project: {ex.Message}");
-        context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-        context.Response.ContentType = "text/plain";
-        return $"Error accessing TIA project: {ex.Message}";
+    /// <summary>
+    /// Exportiert alle PLC-Bausteine eines Bausteinordners in Dateien unter Root\Projekt\Ordnerpfad des jeweiligen Bausteins.
+    /// Know-how-geschützte Bausteine werden übersprungen.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="deviceName">Name des Geräts</query>
+    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
+    /// <query name="path">Bausteinordner, ein Parameter je Ordnername (path=A&amp;path=B); ohne Angabe der Wurzelordner</query>
+    /// <query name="recursive">Unterordner einbeziehen (Standard: true)</query>
+    /// <returns>JSON-String mit FileBatchResult von FileData oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.GetDir)]
+    static public string GetDir(HttpListenerContext context) {
+      string processIdStr = context.Request.QueryString["processId"];
+      string projectName = context.Request.QueryString["projectName"];
+      string deviceName = context.Request.QueryString["deviceName"];
+      string deviceItemName = context.Request.QueryString["deviceItemName"];
+      string[] folderPath = ReadPathFilter(context);
+      bool recursive = cTiaFileBatchHelpers.ReadRecursive(context, out string recursiveError);
+      if (recursiveError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, recursiveError);
       }
+      string rootError = cTiaExportHelpers.ResolveRootDirectory(context.Request.QueryString["rootDirectory"], out string fullRoot);
+      if (rootError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
+      }
+
+      return cTiaFileBatchHelpers.ExecuteBatch(context, processIdStr, projectName, project => {
+        var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
+        if (errorMessage != null) {
+          return ItemResult<FileBatchResult<FileData>>.Fail(HttpStatusCode.NotFound, errorMessage);
+        }
+        PlcBlockGroup group = ResolveGroup<PlcBlockGroup>(plcBlockGroup, folderPath, g => g.Groups, g => g.Name, out string[] groupPath);
+        if (group == null) {
+          return ItemResult<FileBatchResult<FileData>>.Fail(HttpStatusCode.NotFound, $"Error: Block folder '{string.Join("/", folderPath)}' not found in PLC software {plcSoftware.Name}.");
+        }
+
+        var batch = cTiaFileBatchHelpers.NewBatch<FileData>(deviceName, deviceItemName, plcSoftware);
+        errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, project.Name, groupPath, out string directory);
+        if (errorMessage != null) {
+          return ItemResult<FileBatchResult<FileData>>.Fail(HttpStatusCode.BadRequest, errorMessage);
+        }
+        batch.Directory = directory;
+        foreach (PlcBlock block in EnumerateBlocks(group, recursive)) {
+          if (block.IsKnowHowProtected) {
+            batch.Skipped.Add(new FileBatchSkipped { Name = block.Name, Reason = "know-how-protected" });
+            continue;
+          }
+          cTiaFileBatchHelpers.Collect(batch, ExportBlockFiles(project, plcSoftware, block, deviceName, deviceItemName, fullRoot), block.Name, GetBlockPath(block));
+        }
+        return ItemResult<FileBatchResult<FileData>>.Ok(batch);
+      });
+    }
+
+    /// <summary>
+    /// Exportiert mehrere PLC-Bausteine in Dateien (wie GetFile für jeden Baustein).
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="blockName">Namen der PLC-Bausteine, ein Parameter je Baustein (blockName=A&amp;blockName=B)</query>
+    /// <query name="deviceName">Name des Geräts</query>
+    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
+    /// <returns>JSON-String mit FileBatchResult von FileData oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.GetFileList)]
+    static public string GetFileList(HttpListenerContext context) {
+      string processIdStr = context.Request.QueryString["processId"];
+      string projectName = context.Request.QueryString["projectName"];
+      string deviceName = context.Request.QueryString["deviceName"];
+      string deviceItemName = context.Request.QueryString["deviceItemName"];
+      string[] blockNames = cTiaFileBatchHelpers.ReadNameList(context, "blockName");
+      if (blockNames == null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: At least one blockName must be provided (one parameter per block).");
+      }
+      string rootError = cTiaExportHelpers.ResolveRootDirectory(context.Request.QueryString["rootDirectory"], out string fullRoot);
+      if (rootError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
+      }
+
+      return cTiaFileBatchHelpers.ExecuteBatch(context, processIdStr, projectName, project => {
+        var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
+        if (errorMessage != null) {
+          return ItemResult<FileBatchResult<FileData>>.Fail(HttpStatusCode.NotFound, errorMessage);
+        }
+        var batch = cTiaFileBatchHelpers.NewBatch<FileData>(deviceName, deviceItemName, plcSoftware);
+        foreach (string blockName in blockNames) {
+          cTiaFileBatchHelpers.Collect(batch, ExportBlockFiles(project, plcSoftware, plcBlockGroup, deviceName, deviceItemName, blockName, fullRoot), blockName, null);
+        }
+        return ItemResult<FileBatchResult<FileData>>.Ok(batch);
+      });
     }
 
     /// <summary>
@@ -312,19 +358,15 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// sonst der bisherige Ordner des Bausteins bzw. der Wurzelordner.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="blockName">Name des PLC-Bausteins</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <body>PutFileRequest mit RootDirectory, optional Format, Path und BlockNumber</body>
     /// <returns>JSON-String mit PutFileResult oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.PutFile, "PUT")]
     static public string PutFile(HttpListenerContext context) {
-      string methodError = RequireMethod(context, "PUT", BlockRoutes.PutFile);
-      if (methodError != null) {
-        return methodError;
-      }
-
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       string blockName = context.Request.QueryString["blockName"];
@@ -363,8 +405,146 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       }
 
       return ImportBlock(context, processIdStr, projectName, deviceName, deviceItemName, blockName, request.Path, request.BlockNumber, library,
-        (Project project, string[] targetPath, out ImportSource source) =>
-          LoadImportFiles(context, fullRoot, project.Name, targetPath, blockName, requestedFormat, out source));
+        (project, targetPath) => LoadImportFiles(fullRoot, project.Name, targetPath, blockName, requestedFormat));
+    }
+
+    /// <summary>
+    /// Importiert alle Bausteindateien aus Root\Projekt\Ordnerpfad (optional mit Unterverzeichnissen) (HTTP PUT).
+    /// Jede Datei &lt;Name&gt;.s7dcl bzw. &lt;Name&gt;.xml mit Bausteininhalt wird wie bei PutFile mit Path = Verzeichnispfad importiert;
+    /// Dateien von Datentypen und Tagtabellen werden übersprungen. Instanzen von Bibliothekstypen werden
+    /// als In-Test-Version in ihren Typ geschrieben.
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="deviceName">Name des Geräts</query>
+    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <body>PutDirRequest mit RootDirectory, optional Path, Recursive und Format</body>
+    /// <returns>JSON-String mit FileBatchResult von PutFileResult oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.PutDir, "PUT")]
+    static public string PutDir(HttpListenerContext context) {
+      string processIdStr = context.Request.QueryString["processId"];
+      string projectName = context.Request.QueryString["projectName"];
+      string deviceName = context.Request.QueryString["deviceName"];
+      string deviceItemName = context.Request.QueryString["deviceItemName"];
+
+      string requestError = ReadPutDirRequest(context, out PutDirRequest request, out string fullRoot, out string preferredFormat);
+      if (requestError != null) {
+        return requestError;
+      }
+      LibraryWriteOptions library = cTiaLibraryHelpers.InTestForInstances();
+
+      return cTiaFileBatchHelpers.ExecuteBatch(context, processIdStr, projectName, project => {
+        var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
+        if (errorMessage != null) {
+          return ItemResult<FileBatchResult<PutResult>>.Fail(HttpStatusCode.NotFound, errorMessage);
+        }
+        var batch = cTiaFileBatchHelpers.NewBatch<PutResult>(deviceName, deviceItemName, plcSoftware);
+        var scan = cTiaFileBatchHelpers.ScanDirectory(fullRoot, project.Name, request.Path, request.Recursive ?? true, cTiaFileBatchHelpers.KindBlock, preferredFormat, batch);
+        if (scan.Failed) {
+          return ItemResult<FileBatchResult<PutResult>>.Fail(scan.Status, scan.Error);
+        }
+        cTiaFileBatchHelpers.ImportAll(batch, scan.Value,
+          entry => ImportBlock(project, plcSoftware, plcBlockGroup, deviceName, deviceItemName, entry.Name, entry.Path, null, library,
+            (p, targetPath) => LoadImportFiles(fullRoot, p.Name, targetPath, entry.Name, entry.Format)),
+          entry => entry.Name, entry => entry.Path);
+        return ItemResult<FileBatchResult<PutResult>>.Ok(batch);
+      });
+    }
+
+    /// <summary>
+    /// Importiert mehrere PLC-Bausteine aus Dateien (wie PutFile für jeden Eintrag) (HTTP PUT).
+    /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="deviceName">Name des Geräts</query>
+    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <body>PutFileListRequest mit RootDirectory, Items und optional den Bibliotheksoptionen</body>
+    /// <returns>JSON-String mit FileBatchResult von PutFileResult oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.PutFileList, "PUT")]
+    static public string PutFileList(HttpListenerContext context) {
+      string processIdStr = context.Request.QueryString["processId"];
+      string projectName = context.Request.QueryString["projectName"];
+      string deviceName = context.Request.QueryString["deviceName"];
+      string deviceItemName = context.Request.QueryString["deviceItemName"];
+
+      PutFileListRequest request;
+      try {
+        request = ReadBody<PutFileListRequest>(context);
+      } catch (Exception ex) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Invalid request body: {ex.Message}");
+      }
+      if (request?.Items == null || request.Items.Count == 0) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Request body must contain RootDirectory and at least one entry in Items.");
+      }
+      if (request.Items.Any(i => i == null || string.IsNullOrWhiteSpace(i.BlockName))) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Every entry in Items needs a BlockName.");
+      }
+      string rootError = cTiaExportHelpers.ResolveRootDirectory(request.RootDirectory, out string fullRoot);
+      if (rootError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
+      }
+      var formats = new Dictionary<PutFileListItem, string>();
+      foreach (PutFileListItem item in request.Items) {
+        if (string.IsNullOrWhiteSpace(item.Format)) {
+          formats[item] = null;
+        } else {
+          formats[item] = ResolveImportFormat(item.Format, "");
+          if (formats[item] == null) {
+            return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Unknown format '{item.Format}' for block {item.BlockName}. Allowed: {FormatSd}, {FormatXml}.");
+          }
+        }
+      }
+      string libraryError = cTiaLibraryHelpers.ResolveWriteOptions(request.LibraryMode, request.LibraryVersion, request.LibraryAuthor, request.LibraryComment, out LibraryWriteOptions library);
+      if (libraryError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, libraryError);
+      }
+
+      return cTiaFileBatchHelpers.ExecuteBatch(context, processIdStr, projectName, project => {
+        var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
+        if (errorMessage != null) {
+          return ItemResult<FileBatchResult<PutResult>>.Fail(HttpStatusCode.NotFound, errorMessage);
+        }
+        var batch = cTiaFileBatchHelpers.NewBatch<PutResult>(deviceName, deviceItemName, plcSoftware);
+        cTiaFileBatchHelpers.ImportAll(batch, request.Items,
+          item => ImportBlock(project, plcSoftware, plcBlockGroup, deviceName, deviceItemName, item.BlockName.Trim(), item.Path, item.BlockNumber, library,
+            (p, targetPath) => LoadImportFiles(fullRoot, p.Name, targetPath, item.BlockName.Trim(), formats[item])),
+          item => item.BlockName, item => item.Path);
+        return ItemResult<FileBatchResult<PutResult>>.Ok(batch);
+      });
+    }
+
+    /// <summary>
+    /// Liest und prüft den Body eines PutDir-Requests.
+    /// </summary>
+    /// <returns>Fehlermeldung (Antwort ist bereits gesetzt) oder null bei Erfolg</returns>
+    static internal string ReadPutDirRequest(HttpListenerContext context, out PutDirRequest request, out string fullRoot, out string preferredFormat) {
+      fullRoot = null;
+      preferredFormat = null;
+      try {
+        request = ReadBody<PutDirRequest>(context);
+      } catch (Exception ex) {
+        request = null;
+        return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Invalid request body: {ex.Message}");
+      }
+      if (request == null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Request body must contain RootDirectory.");
+      }
+      if (request.Path != null && request.Path.Any(string.IsNullOrWhiteSpace)) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Path must not contain empty folder names.");
+      }
+      string rootError = cTiaExportHelpers.ResolveRootDirectory(request.RootDirectory, out fullRoot);
+      if (rootError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
+      }
+      if (!string.IsNullOrWhiteSpace(request.Format)) {
+        preferredFormat = ResolveImportFormat(request.Format, "");
+        if (preferredFormat == null) {
+          return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Unknown format '{request.Format}'. Allowed: {FormatSd}, {FormatXml}.");
+        }
+      }
+      return null;
     }
 
     /// <summary>
@@ -382,128 +562,182 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <returns>JSON-String mit PutResult bzw. PutFileResult oder Fehlermeldung</returns>
     static private string ImportBlock(HttpListenerContext context, string processIdStr, string projectName, string deviceName, string deviceItemName,
       string blockName, string[] requestPath, int? blockNumber, LibraryWriteOptions library, ImportSourceLoader loadSource) {
-      try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
-          var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
+      return cTiaFileBatchHelpers.ExecuteItem(context, processIdStr, projectName, project => {
+        var errorMessage = cTiaProject.GetPlcSystemBlockGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup);
+        if (errorMessage != null) {
+          return ItemResult<PutResult>.Fail(HttpStatusCode.NotFound, errorMessage);
+        }
+        return ImportBlock(project, plcSoftware, plcBlockGroup, deviceName, deviceItemName, blockName, requestPath, blockNumber, library, loadSource);
+      });
+    }
+
+    /// <summary>
+    /// Legt einen PLC-Baustein in einer bereits ermittelten PLC-Software neu an oder überschreibt ihn (siehe oben).
+    /// </summary>
+    /// <returns>PutResult bzw. PutFileResult oder Fehler</returns>
+    static private ItemResult<PutResult> ImportBlock(Project project, PlcSoftware plcSoftware, PlcBlockGroup plcBlockGroup, string deviceName, string deviceItemName,
+      string blockName, string[] requestPath, int? blockNumber, LibraryWriteOptions library, ImportSourceLoader loadSource) {
+      PlcBlock existing = cTiaFindHelpers.FindBlock(plcBlockGroup, blockName);
+      string[] existingPath = existing != null ? GetBlockPath(existing) : null;
+      string[] targetPath = requestPath ?? existingPath ?? new string[0];
+
+      if (existing != null && existing.IsKnowHowProtected) {
+        return ItemResult<PutResult>.Fail(HttpStatusCode.Conflict, $"Error: Block {blockName} is know-how-protected and cannot be overwritten.");
+      }
+
+      LibraryTypeInstanceInfo instanceInfo = cTiaLibraryHelpers.GetInstanceInfo(existing);
+      string libraryMode = library.ModeFor(instanceInfo);
+      if (instanceInfo != null) {
+        string typeDescription = cTiaLibraryHelpers.Describe(instanceInfo.LibraryTypeVersion);
+        if (libraryMode == cTiaLibraryHelpers.ModeNone) {
+          return ItemResult<PutResult>.Fail(HttpStatusCode.Conflict,
+            $"Error: Block {blockName} is an instance of {typeDescription} and cannot be overwritten by a plain import. " +
+            $"Pass libraryMode '{cTiaLibraryHelpers.ModeInTest}' to write the content as in-test version of the type, " +
+            $"or '{cTiaLibraryHelpers.ModeRelease}' to write and release it as a new version.");
+        }
+        if (!PathEquals(existingPath, targetPath)) {
+          return ItemResult<PutResult>.Fail(HttpStatusCode.BadRequest,
+            $"Error: Block {blockName} is an instance of {typeDescription} and cannot be moved to another folder by an import.");
+        }
+      } else if (libraryMode != cTiaLibraryHelpers.ModeNone) {
+        return ItemResult<PutResult>.Fail(HttpStatusCode.BadRequest,
+          $"Error: libraryMode is only allowed for existing instances of library types; block {blockName} " +
+          (existing == null ? "does not exist." : "is not connected to a library type."));
+      }
+
+      ItemResult<ImportSource> loaded = loadSource(project, targetPath);
+      if (loaded.Failed) {
+        return ItemResult<PutResult>.Fail(loaded.Status, loaded.Error);
+      }
+      ImportSource source = loaded.Value;
+
+      // Der Import (v. a. aus SD-Dokumenten ohne Nummer) vergibt die Bausteinnummer neu;
+      // die bisherige Nummer wird deshalb vorher gemerkt und danach wiederhergestellt.
+      int? targetNumber = blockNumber ?? existing?.Number;
+      bool? existingAutoNumber = existing?.AutoNumber;
+
+      PlcBlock imported;
+      string[] messages;
+      string errorMessage;
+      if (instanceInfo != null) {
+        errorMessage = ImportTypeVersion(existing, instanceInfo, blockName, source, library, out messages);
+        if (errorMessage != null) {
+          return ItemResult<PutResult>.Fail(HttpStatusCode.InternalServerError, errorMessage + FormatMessages(messages));
+        }
+        imported = cTiaFindHelpers.FindBlock(plcBlockGroup, blockName);
+      } else {
+        PlcBlockGroup targetGroup = EnsureBlockGroup(plcBlockGroup, targetPath);
+
+        // Liegt der Baustein in einem anderen Ordner als dem Ziel, wird er gesichert und gelöscht,
+        // damit der Import ihn im Zielordner neu anlegt; bei einem Importfehler wird die Sicherung zurückgespielt.
+        string backupXml = null;
+        if (existing != null && !PathEquals(existingPath, targetPath)) {
+          errorMessage = ExportAsXml(existing, "_backup_" + blockName, out backupXml);
           if (errorMessage != null) {
-            return ErrorResponse(context, HttpStatusCode.NotFound, errorMessage);
+            return ItemResult<PutResult>.Fail(HttpStatusCode.InternalServerError, $"Error: Could not back up block {blockName} before moving it: {errorMessage}");
           }
+          existing.Delete();
+        }
 
-          PlcBlock existing = cTiaFindHelpers.FindBlock(plcBlockGroup, blockName);
-          string[] existingPath = existing != null ? GetBlockPath(existing) : null;
-          string[] targetPath = requestPath ?? existingPath ?? new string[0];
-
-          if (existing != null && existing.IsKnowHowProtected) {
-            return ErrorResponse(context, HttpStatusCode.Conflict, $"Error: Block {blockName} is know-how-protected and cannot be overwritten.");
+        errorMessage = Import(targetGroup, blockName, source.Format, source.Content, source.MultiLingualText, out imported, out messages);
+        if (errorMessage != null) {
+          if (backupXml != null) {
+            string restoreError = Import(EnsureBlockGroup(plcBlockGroup, existingPath), "_backup_" + blockName, FormatXml, backupXml, null, out _, out _);
+            errorMessage += restoreError == null
+              ? " The original block was restored."
+              : $" Restoring the original block failed: {restoreError}";
           }
+          return ItemResult<PutResult>.Fail(HttpStatusCode.InternalServerError, errorMessage);
+        }
+      }
+      if (imported == null) {
+        return ItemResult<PutResult>.Fail(HttpStatusCode.InternalServerError, $"Error: Import finished, but block {blockName} was not found afterwards.");
+      }
 
-          LibraryTypeInstanceInfo instanceInfo = cTiaLibraryHelpers.GetInstanceInfo(existing);
-          if (instanceInfo != null) {
-            string typeDescription = cTiaLibraryHelpers.Describe(instanceInfo.LibraryTypeVersion);
-            if (library.Mode == cTiaLibraryHelpers.ModeNone) {
-              return ErrorResponse(context, HttpStatusCode.Conflict,
-                $"Error: Block {blockName} is an instance of {typeDescription} and cannot be overwritten by a plain import. " +
-                $"Pass libraryMode '{cTiaLibraryHelpers.ModeInTest}' to write the content as in-test version of the type, " +
-                $"or '{cTiaLibraryHelpers.ModeRelease}' to write and release it as a new version.");
-            }
-            if (!PathEquals(existingPath, targetPath)) {
-              return ErrorResponse(context, HttpStatusCode.BadRequest,
-                $"Error: Block {blockName} is an instance of {typeDescription} and cannot be moved to another folder by an import.");
-            }
-          } else if (library.Mode != cTiaLibraryHelpers.ModeNone) {
-            return ErrorResponse(context, HttpStatusCode.BadRequest,
-              $"Error: libraryMode is only allowed for existing instances of library types; block {blockName} " +
-              (existing == null ? "does not exist." : "is not connected to a library type."));
+      if (!imported.Name.Equals(blockName, StringComparison.OrdinalIgnoreCase)) {
+        messages = messages.Concat(new[] { $"Imported block is named '{imported.Name}', not '{blockName}'." }).ToArray();
+      }
+
+      if (targetNumber.HasValue && imported.Number != targetNumber.Value) {
+        string numberError = SetBlockNumber(imported, targetNumber.Value, existingAutoNumber ?? false);
+        if (numberError != null) {
+          messages = messages.Concat(new[] { $"Block number could not be set to {targetNumber.Value} (now {imported.Number}): {numberError}" }).ToArray();
+        }
+      }
+
+      PutResult result = source.Files == null
+        ? new PutResult()
+        : new PutFileResult { Directory = source.Directory, Files = source.Files };
+      result.DeviceName = deviceName;
+      result.DeviceItemName = deviceItemName;
+      result.PlcName = plcSoftware.Name;
+      result.BlockName = imported.Name;
+      result.BlockNumber = imported.Number;
+      result.BlockType = imported.GetType().Name;
+      result.ProgrammingLanguage = imported.ProgrammingLanguage.ToString();
+      result.Path = GetBlockPath(imported);
+      result.Library = cTiaLibraryHelpers.GetLibraryInfo(imported);
+      result.Created = existing == null;
+      result.Format = source.Format;
+      result.Messages = messages;
+      return ItemResult<PutResult>.Ok(result);
+    }
+
+    /// <summary>
+    /// Exportiert einen PLC-Baustein (gesucht über den Namen) in Dateien unter Root\Projekt\Ordnerpfad des Bausteins.
+    /// </summary>
+    static private ItemResult<FileData> ExportBlockFiles(Project project, PlcSoftware plcSoftware, PlcBlockGroup plcBlockGroup, string deviceName, string deviceItemName, string blockName, string fullRoot) {
+      PlcBlock block = cTiaFindHelpers.FindBlock(plcBlockGroup, blockName);
+      if (block == null) {
+        return ItemResult<FileData>.Fail(HttpStatusCode.NotFound, $"Error: Block with name {blockName} not found in PLC software {plcSoftware.Name}.");
+      }
+      return ExportBlockFiles(project, plcSoftware, block, deviceName, deviceItemName, fullRoot);
+    }
+
+    /// <summary>
+    /// Exportiert einen PLC-Baustein in Dateien unter Root\Projekt\Ordnerpfad des Bausteins.
+    /// </summary>
+    static private ItemResult<FileData> ExportBlockFiles(Project project, PlcSoftware plcSoftware, PlcBlock block, string deviceName, string deviceItemName, string fullRoot) {
+      string[] blockPath = GetBlockPath(block);
+      string errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, project.Name, blockPath, out string directory);
+      if (errorMessage != null) {
+        return ItemResult<FileData>.Fail(HttpStatusCode.BadRequest, errorMessage);
+      }
+
+      errorMessage = ExportToDirectory(block, block.Name, directory, out string format, out string[] files);
+      if (errorMessage != null) {
+        return ItemResult<FileData>.Fail(HttpStatusCode.InternalServerError, errorMessage);
+      }
+
+      return ItemResult<FileData>.Ok(new FileData {
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        PlcName = plcSoftware.Name,
+        BlockName = block.Name,
+        BlockNumber = block.Number,
+        BlockType = block.GetType().Name,
+        ProgrammingLanguage = block.ProgrammingLanguage.ToString(),
+        Path = blockPath,
+        Library = cTiaLibraryHelpers.GetLibraryInfo(block),
+        Format = format,
+        Directory = directory,
+        Files = files
+      });
+    }
+
+    /// <summary>
+    /// Liefert die Bausteine eines Ordners, optional mit allen Unterordnern.
+    /// </summary>
+    static private IEnumerable<PlcBlock> EnumerateBlocks(PlcBlockGroup group, bool recursive) {
+      foreach (PlcBlock block in group.Blocks) {
+        yield return block;
+      }
+      if (recursive) {
+        foreach (PlcBlockUserGroup userGroup in group.Groups) {
+          foreach (PlcBlock block in EnumerateBlocks(userGroup, true)) {
+            yield return block;
           }
-
-          errorMessage = loadSource(project, targetPath, out ImportSource source);
-          if (errorMessage != null) {
-            return errorMessage;
-          }
-
-          // Der Import (v. a. aus SD-Dokumenten ohne Nummer) vergibt die Bausteinnummer neu;
-          // die bisherige Nummer wird deshalb vorher gemerkt und danach wiederhergestellt.
-          int? targetNumber = blockNumber ?? existing?.Number;
-          bool? existingAutoNumber = existing?.AutoNumber;
-
-          PlcBlock imported;
-          string[] messages;
-          if (instanceInfo != null) {
-            errorMessage = ImportTypeVersion(existing, instanceInfo, blockName, source, library, out messages);
-            if (errorMessage != null) {
-              return ErrorResponse(context, HttpStatusCode.InternalServerError, errorMessage + FormatMessages(messages));
-            }
-            imported = cTiaFindHelpers.FindBlock(plcBlockGroup, blockName);
-          } else {
-            PlcBlockGroup targetGroup = EnsureBlockGroup(plcBlockGroup, targetPath);
-
-            // Liegt der Baustein in einem anderen Ordner als dem Ziel, wird er gesichert und gelöscht,
-            // damit der Import ihn im Zielordner neu anlegt; bei einem Importfehler wird die Sicherung zurückgespielt.
-            string backupXml = null;
-            if (existing != null && !PathEquals(existingPath, targetPath)) {
-              errorMessage = ExportAsXml(existing, "_backup_" + blockName, out backupXml);
-              if (errorMessage != null) {
-                return ErrorResponse(context, HttpStatusCode.InternalServerError, $"Error: Could not back up block {blockName} before moving it: {errorMessage}");
-              }
-              existing.Delete();
-            }
-
-            errorMessage = Import(targetGroup, blockName, source.Format, source.Content, source.MultiLingualText, out imported, out messages);
-            if (errorMessage != null) {
-              if (backupXml != null) {
-                string restoreError = Import(EnsureBlockGroup(plcBlockGroup, existingPath), "_backup_" + blockName, FormatXml, backupXml, null, out _, out _);
-                errorMessage += restoreError == null
-                  ? " The original block was restored."
-                  : $" Restoring the original block failed: {restoreError}";
-              }
-              return ErrorResponse(context, HttpStatusCode.InternalServerError, errorMessage);
-            }
-          }
-          if (imported == null) {
-            return ErrorResponse(context, HttpStatusCode.InternalServerError, $"Error: Import finished, but block {blockName} was not found afterwards.");
-          }
-
-          if (!imported.Name.Equals(blockName, StringComparison.OrdinalIgnoreCase)) {
-            messages = messages.Concat(new[] { $"Imported block is named '{imported.Name}', not '{blockName}'." }).ToArray();
-          }
-
-          if (targetNumber.HasValue && imported.Number != targetNumber.Value) {
-            string numberError = SetBlockNumber(imported, targetNumber.Value, existingAutoNumber ?? false);
-            if (numberError != null) {
-              messages = messages.Concat(new[] { $"Block number could not be set to {targetNumber.Value} (now {imported.Number}): {numberError}" }).ToArray();
-            }
-          }
-
-          PutResult result = source.Files == null
-            ? new PutResult()
-            : new PutFileResult { Directory = source.Directory, Files = source.Files };
-          result.DeviceName = deviceName;
-          result.DeviceItemName = deviceItemName;
-          result.PlcName = plcSoftware.Name;
-          result.BlockName = imported.Name;
-          result.BlockNumber = imported.Number;
-          result.BlockType = imported.GetType().Name;
-          result.ProgrammingLanguage = imported.ProgrammingLanguage.ToString();
-          result.Path = GetBlockPath(imported);
-          result.Library = cTiaLibraryHelpers.GetLibraryInfo(imported);
-          result.Created = existing == null;
-          result.Format = source.Format;
-          result.Messages = messages;
-
-          context.Response.ContentType = "application/json";
-          return JsonConvert.SerializeObject(result);
-        });
-        return retValue;
-      } catch (Siemens.Engineering.EngineeringObjectDisposedException ex) {
-        Console.Error.WriteLine($"TIA session disposed: {ex.Message}");
-        context.Response.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
-        context.Response.ContentType = "text/plain";
-        return "Error: TIA session unavailable. Please re-open TIA Portal.";
-      } catch (Exception ex) {
-        Console.Error.WriteLine($"Error accessing TIA project: {ex.Message}");
-        context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
-        context.Response.ContentType = "text/plain";
-        return $"Error accessing TIA project: {ex.Message}";
+        }
       }
     }
 
@@ -511,19 +745,15 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Passt die Startwerte von Variablen eines Datenbausteins an (HTTP PATCH).
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="blockName">Name des Datenbausteins</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <body>PatchRequest mit der Liste der neuen Startwerte</body>
     /// <returns>JSON-String mit PatchResult oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.Patch, "PATCH")]
     static public string Patch(HttpListenerContext context) {
-      string methodError = RequireMethod(context, "PATCH", BlockRoutes.Patch);
-      if (methodError != null) {
-        return methodError;
-      }
-
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       string blockName = context.Request.QueryString["blockName"];
@@ -630,18 +860,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Die Instanzen fallen auf die zuletzt freigegebene Version zurück.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="blockName">Name des PLC-Bausteins (Instanz des Bibliothekstyps)</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
     /// <returns>JSON-String mit DiscardTypeVersionResult oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.DiscardTypeVersion, "POST")]
     static public string DiscardTypeVersion(HttpListenerContext context) {
-      string methodError = RequireMethod(context, "POST", BlockRoutes.DiscardTypeVersion);
-      if (methodError != null) {
-        return methodError;
-      }
-
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       string blockName = context.Request.QueryString["blockName"];
@@ -710,9 +936,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Überprüft für jeden gefundenen ProgrammingLanguage einen Beispielbaustein auf SD- und XML-Export.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processIdStr">Prozess-ID des TIA-Projekts</query>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <returns>JSON-String mit der Liste der Export-Fähigkeiten oder Fehlermeldung</returns>
+    [RestRoute(BlockRoutes.ListExportCapabilities)]
     static public string ListExportCapabilities(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
@@ -880,7 +1107,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <summary>
     /// Schreibt den Import-Inhalt als .s7dcl/.s7res (SD) bzw. .xml (XML) in ein Verzeichnis.
     /// </summary>
-    static private void WriteImportDocuments(DirectoryInfo directory, string safeName, string format, string content, string multiLingualText) {
+    static internal void WriteImportDocuments(DirectoryInfo directory, string safeName, string format, string content, string multiLingualText) {
       var encoding = new UTF8Encoding(false);
       if (format == FormatSd) {
         File.WriteAllText(Path.Combine(directory.FullName, safeName + ".s7dcl"), content, encoding);
@@ -921,7 +1148,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <summary>
     /// Hängt Meldungen an eine Fehlermeldung an (leer, wenn es keine gibt).
     /// </summary>
-    static private string FormatMessages(string[] messages) {
+    static internal string FormatMessages(string[] messages) {
       return messages == null || messages.Length == 0 ? "" : " Steps: " + string.Join(" | ", messages);
     }
 
@@ -931,45 +1158,38 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     static private readonly string[] BlockFileExtensions = { ".s7dcl", ".s7res", ".xml" };
 
     /// <summary>
-    /// Inhalt für den Import eines PLC-Bausteins.
-    /// </summary>
-    private class ImportSource {
-      public string Format;
-      public string Content;
-      public string MultiLingualText;
-      public string Directory;   // nur bei Import aus Dateien
-      public string[] Files;     // nur bei Import aus Dateien; null = Inhalt aus dem Request-Body
-    }
-
-    /// <summary>
     /// Liefert den Inhalt für den Import, sobald der Zielordner des Bausteins feststeht.
     /// </summary>
     /// <param name="project">TIA-Projekt</param>
     /// <param name="targetPath">Zielordner des Bausteins</param>
-    /// <param name="source">Out-Parameter für den Import-Inhalt</param>
-    /// <returns>Fehlermeldung (Antwort ist bereits gesetzt) oder null bei Erfolg</returns>
-    private delegate string ImportSourceLoader(Project project, string[] targetPath, out ImportSource source);
+    /// <returns>Import-Inhalt oder Fehler</returns>
+    private delegate ItemResult<ImportSource> ImportSourceLoader(Project project, string[] targetPath);
 
     /// <summary>
     /// Liest die Dateien eines PLC-Bausteins aus Root\Projekt\Ordnerpfad.
     /// Ohne Formatangabe wird das Format aus den vorhandenen Dateien abgeleitet (.s7dcl = SD, .xml = XML).
     /// </summary>
-    /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <param name="fullRoot">Wurzelverzeichnis aus ResolveRootDirectory</param>
     /// <param name="projectName">Name des TIA-Projekts</param>
     /// <param name="path">Ordnerpfad des Bausteins</param>
     /// <param name="blockName">Name des PLC-Bausteins</param>
     /// <param name="format">FormatSd, FormatXml oder null für automatische Erkennung</param>
-    /// <param name="source">Out-Parameter für den Import-Inhalt</param>
-    /// <returns>Fehlermeldung (Antwort ist bereits gesetzt) oder null bei Erfolg</returns>
-    static private string LoadImportFiles(HttpListenerContext context, string fullRoot, string projectName, string[] path, string blockName, string format, out ImportSource source) {
-      source = null;
+    /// <returns>Import-Inhalt oder Fehler</returns>
+    static private ItemResult<ImportSource> LoadImportFiles(string fullRoot, string projectName, string[] path, string blockName, string format) {
+      return LoadImportDocuments(fullRoot, projectName, path, blockName, format, "Block");
+    }
+
+    /// <summary>
+    /// Liest .s7dcl/.s7res bzw. .xml eines Bausteins oder Datentyps aus Root\Projekt\Ordnerpfad und prüft den Inhalt.
+    /// </summary>
+    /// <param name="objectLabel">Bezeichnung für Fehlermeldungen, z. B. "Block" oder "UDT"</param>
+    static internal ItemResult<ImportSource> LoadImportDocuments(string fullRoot, string projectName, string[] path, string name, string format, string objectLabel) {
       string errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, projectName, path, out string directory);
       if (errorMessage != null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, errorMessage);
+        return ItemResult<ImportSource>.Fail(HttpStatusCode.BadRequest, errorMessage);
       }
 
-      string baseName = Path.Combine(directory, cTiaExportHelpers.SanitizeFileName(blockName));
+      string baseName = Path.Combine(directory, cTiaExportHelpers.SanitizeFileName(name));
       string sdFile = baseName + ".s7dcl";
       string resFile = baseName + ".s7res";
       string xmlFile = baseName + ".xml";
@@ -978,14 +1198,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         bool sdExists = File.Exists(sdFile);
         bool xmlExists = File.Exists(xmlFile);
         if (sdExists && xmlExists) {
-          return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Both {sdFile} and {xmlFile} exist. Pass Format to choose one.");
+          return ItemResult<ImportSource>.Fail(HttpStatusCode.BadRequest, $"Error: Both {sdFile} and {xmlFile} exist. Pass Format to choose one.");
         }
         format = xmlExists ? FormatXml : FormatSd;
       }
 
       string contentFile = format == FormatSd ? sdFile : xmlFile;
       if (!File.Exists(contentFile)) {
-        return ErrorResponse(context, HttpStatusCode.NotFound, $"Error: Block file not found: {contentFile} (expected in rootDirectory\\project\\folder path of the block).");
+        return ItemResult<ImportSource>.Fail(HttpStatusCode.NotFound, $"Error: {objectLabel} file not found: {contentFile} (expected in rootDirectory\\project\\folder path).");
       }
 
       var files = new List<string> { contentFile };
@@ -998,17 +1218,16 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
 
       errorMessage = ValidateImportContent(format, content, multiLingualText);
       if (errorMessage != null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, $"{errorMessage} (files: {string.Join(", ", files)})");
+        return ItemResult<ImportSource>.Fail(HttpStatusCode.BadRequest, $"{errorMessage} (files: {string.Join(", ", files)})");
       }
 
-      source = new ImportSource {
+      return ItemResult<ImportSource>.Ok(new ImportSource {
         Format = format,
         Content = content,
         MultiLingualText = multiLingualText,
         Directory = directory,
         Files = files.ToArray()
-      };
-      return null;
+      });
     }
 
     /// <summary>

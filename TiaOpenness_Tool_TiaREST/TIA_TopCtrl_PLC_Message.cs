@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Text.RegularExpressions;
+using Tophinke.TiaOpenness.Tool.Consts;
 using Tophinke.TiaOpenness.Tool.Types.TopCtrl.PLC.Message;
 
 namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
@@ -28,8 +29,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
 
     /// <summary>
     /// Listet alle relevanten Meldungen (xSelect = true) eines TIA-Projekts.
-    /// Query: processId, projectName; optional deviceName, deviceItemName (sonst alle PLCs).
     /// </summary>
+    /// <param name="context">HTTP-Anfrage-Kontext</param>
+    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
+    /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="deviceName">Optional: Name des Geräts; ohne Angabe alle PLCs</query>
+    /// <query name="deviceItemName">Optional: Name des Geräteelements; ohne Angabe alle PLCs</query>
+    /// <returns>JSON-String mit der Liste der Meldungen oder Fehlermeldung</returns>
+    [RestRoute(MessageRoutes.List)]
     static public string List(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];

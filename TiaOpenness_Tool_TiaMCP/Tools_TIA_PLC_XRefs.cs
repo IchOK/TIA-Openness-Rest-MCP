@@ -7,7 +7,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaMCP.PLC;
 
 [McpServerToolType]
 public class XRefTools {
-  [McpServerTool, Description(
+  [McpServerTool(Name = "tia_plc_xrefs_get"), Description(
     "Returns cross-references for a PLC object (where it is used / referenced). " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON object with: " +
