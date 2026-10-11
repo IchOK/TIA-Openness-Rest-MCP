@@ -29,6 +29,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       // Sync Openness firewall entry before any TIA attach (needs admin / elevated process).
       OpennessWhitelist.TryUpdate(settings.TiaVersion);
 #endif
+      AppDomain.CurrentDomain.ProcessExit += (s, e) => TiaConnectionManager.Instance.Dispose();
+      Console.CancelKeyPress += (s, e) => TiaConnectionManager.Instance.Dispose();
       RunServer(settings);
       return 0;
     }

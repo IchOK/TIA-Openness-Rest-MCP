@@ -751,7 +751,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="typeName">Name des Datentyps</param>
     /// <param name="content">Out-Parameter für den Inhalt des SD-Dokuments</param>
     /// <returns>Fehlermeldung, falls das Exportieren fehlschlägt, sonst null</returns>
-    static private string ExportAsDocuments(PlcType type, string typeName, out string content, out string multiLingualText) {
+    static internal string ExportAsDocuments(PlcType type, string typeName, out string content, out string multiLingualText) {
       content = null;
       multiLingualText = null;
       string safeName = cTiaExportHelpers.SanitizeFileName(typeName);

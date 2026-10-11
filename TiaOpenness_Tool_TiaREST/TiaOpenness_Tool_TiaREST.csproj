@@ -65,6 +65,7 @@
     <Compile Include="TIA_PLC_Helper_Find.cs" />
     <Compile Include="TIA_PLC_Helper_Library.cs" />
     <Compile Include="TIA_PLC_Helper_Request.cs" />
+    <Compile Include="TIA_PLC_Helper_SourceModel.cs" />
     <Compile Include="TIA_PLC_Blocks.cs" />
     <Compile Include="TIA_PLC_Compile.cs" />
     <Compile Include="TIA_PLC_UDTs.cs" />

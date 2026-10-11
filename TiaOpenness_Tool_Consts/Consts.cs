@@ -21,6 +21,9 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   public static class ProjectRoutes
   {
     public const string List = "/api/projects/list";
+    public const string Open = "/api/projects/open";
+    public const string Save = "/api/projects/save";
+    public const string Close = "/api/projects/close";
   }
 
   /// <summary>
@@ -93,5 +96,6 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   /// </summary>
   public static class MessageRoutes {
     public const string List = "/api/topctrl/plc/messages/list";
+    public const string GetFile = "/api/topctrl/plc/messages/get-file";
   }
 }

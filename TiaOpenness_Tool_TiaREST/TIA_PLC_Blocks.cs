@@ -99,6 +99,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="blockName">Name des PLC-Bausteins</query>
     /// <query name="deviceName">Name des Geräts</query>
     /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="format">Optional: "SD" oder "XML"; ohne Angabe SD für LAD/FBD/SCL/DB mit XML als Rückfall, sonst XML</query>
     /// <returns>JSON-String mit dem PLC-Baustein als SD-Dokument oder Fehlermeldung</returns>
     [RestRoute(BlockRoutes.Get)]
     static public string Get(HttpListenerContext context) {
@@ -107,6 +108,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       string blockName = context.Request.QueryString["blockName"];
       string deviceName = context.Request.QueryString["deviceName"];
       string deviceItemName = context.Request.QueryString["deviceItemName"];
+      string requestedFormat = context.Request.QueryString["format"];
+      if (!string.IsNullOrWhiteSpace(requestedFormat)) {
+        requestedFormat = ResolveImportFormat(requestedFormat, "");
+        if (requestedFormat == null) {
+          return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Unknown format '{context.Request.QueryString["format"]}'. Allowed: SD, XML.");
+        }
+      }
 
       try {
         var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
@@ -127,7 +135,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
             return errorMessage;
           }
 
-          errorMessage = Export(block, blockName, out string fileContent, out string multiLingualText, out string format);
+          errorMessage = Export(block, blockName, out string fileContent, out string multiLingualText, out string format, requestedFormat);
           if (errorMessage != null) {
             Console.Error.WriteLine(errorMessage);
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
@@ -1472,7 +1480,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="content">Out-Parameter für den Inhalt des SD-Dokuments oder XML</param>
     /// <param name="format">Out-Parameter für das Format des Export-Ergebnisses</param>
     /// <returns>Fehlermeldung oder null bei Erfolg</returns>
-    static private string Export(PlcBlock block, string blockName, out string content, out string multiLingualText, out string format) {
+    static internal string Export(PlcBlock block, string blockName, out string content, out string multiLingualText, out string format, string requestedFormat = null) {
       content = null;
       multiLingualText = null;
       format = null;
@@ -1484,19 +1492,23 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         return "Error exporting block " + blockName + ": block is know-how-protected";
       }
 
-      if (BlockIsDocument(block, blockName)) {
-        string error = ExportAsDocuments(block, blockName, out content, out multiLingualText);
-        if (error != null) {
-          return error;
+      string sdError = null;
+      if (requestedFormat != FormatXml && BlockIsDocument(block, blockName)) {
+        sdError = ExportAsDocuments(block, blockName, out content, out multiLingualText);
+        if (sdError == null) {
+          format = FormatSd;
+          return null;
         }
-        format = FormatSd;
-        return null;
+        if (requestedFormat == FormatSd) {
+          return sdError;
+        }
       }
 
       string xmlError = ExportAsXml(block, blockName, out content);
       if (xmlError != null) {
-        return xmlError;
+        return sdError != null ? sdError + " / " + xmlError : xmlError;
       }
+      multiLingualText = null;
       format = FormatXml;
       return null;
     }

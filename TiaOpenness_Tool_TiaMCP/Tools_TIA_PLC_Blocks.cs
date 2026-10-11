@@ -102,7 +102,8 @@ public class BlockTools {
     "ProgrammingLanguage (e.g. LAD, SCL, FBD, STL, DB), " +
     "Path (string array of user group/folder names from the block group root to the block; empty if the block is in the root), " +
     LibraryInfoDescription + ", " +
-    "Format (\"SimaticData/SD\" for LAD, FBD, SCL and DB incl. F-variants, or \"SimaticML/XML\" for all other languages such as STL or GRAPH), " +
+    "Format (\"SimaticData/SD\" for LAD, FBD, SCL and DB incl. F-variants, or \"SimaticML/XML\" for all other languages such as STL or GRAPH, " +
+    "and as fallback when the SD export fails, e.g. for blocks last modified before TIA Portal V20 Update 4), " +
     "Content (block text: SIMATIC SD (.s7dcl) or Simatic ML XML with interface, attributes and program code where applicable), " +
     "MultiLingualText (only for Format \"SimaticData/SD\": content of the .s7res file with the multilingual comments and texts. " +
     "Content references them by ID, e.g. { S7_MLC := \"MLC_3SC\" }, and MultiLingualText holds the texts per ID and language " +
@@ -114,11 +115,15 @@ public class BlockTools {
     [Description("The name of the project")] string projectName,
     [Description("The name of the block")] string blockName,
     [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName) {
+    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("Optional export format: \"SD\" or \"XML\". Omit for SD where supported with XML as fallback")] string? format = null) {
     var activity = ToolActivity.Start<BlockTools>($"Baustein {blockName} wird abgerufen");
     try {
       string safeProjectName = Uri.EscapeDataString(projectName);
       string route = $"{BlockRoutes.Get}?processId={processId}&projectName={safeProjectName}&blockName={Uri.EscapeDataString(blockName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
+      if (!string.IsNullOrWhiteSpace(format)) {
+        route += $"&format={Uri.EscapeDataString(format)}";
+      }
 
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
