@@ -141,7 +141,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
     /// <summary>
     /// Sammelt die Meldungen aller passenden PLCs; null, wenn keine PLC gefunden wurde.
     /// </summary>
-    static ListResult Collect(Project project, string deviceName, string deviceItemName, bool includeUnselected) {
+    static internal ListResult Collect(Project project, string deviceName, string deviceItemName, bool includeUnselected) {
       var result = new ListResult();
       int plcCount = 0;
       foreach (Device device in project.Devices) {

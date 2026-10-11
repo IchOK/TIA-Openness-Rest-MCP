@@ -92,10 +92,32 @@ namespace Tophinke.TiaOpenness.Tool.Consts
   }
 
   /// <summary>
+  /// Konstanten für die WinCC Unified-HMI-Routen.
+  /// </summary>
+  public static class HmiRoutes {
+    public const string DevicesList = "/api/hmi/devices/list";
+    public const string TagsList = "/api/hmi/tags/list";
+    public const string TagsPut = "/api/hmi/tags/put";
+    public const string TagsDelete = "/api/hmi/tags/delete";
+    public const string TagsGetFile = "/api/hmi/tags/get-file";
+    public const string TagsPutFile = "/api/hmi/tags/put-file";
+    public const string AlarmsList = "/api/hmi/alarms/list";
+    public const string AlarmsPut = "/api/hmi/alarms/put";
+    public const string AlarmsDelete = "/api/hmi/alarms/delete";
+    public const string AlarmClassesList = "/api/hmi/alarmclasses/list";
+    public const string AlarmClassesPut = "/api/hmi/alarmclasses/put";
+    public const string AlarmClassesDelete = "/api/hmi/alarmclasses/delete";
+    public const string LogsList = "/api/hmi/logs/list";
+    public const string LogsPut = "/api/hmi/logs/put";
+    public const string LogsDelete = "/api/hmi/logs/delete";
+  }
+
+  /// <summary>
   /// Konstanten für die Melde-/Message-Routen.
   /// </summary>
   public static class MessageRoutes {
     public const string List = "/api/topctrl/plc/messages/list";
     public const string GetFile = "/api/topctrl/plc/messages/get-file";
+    public const string HmiSync = "/api/topctrl/hmi/messages/sync";
   }
 }

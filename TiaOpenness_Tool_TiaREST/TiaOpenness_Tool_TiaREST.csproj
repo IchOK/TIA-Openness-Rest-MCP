@@ -71,6 +71,11 @@
     <Compile Include="TIA_PLC_UDTs.cs" />
     <Compile Include="TIA_PLC_TagTables.cs" />
     <Compile Include="TIA_PLC_XRefs.cs" />
+    <Compile Include="TIA_HMI_Alarms.cs" />
+    <Compile Include="TIA_HMI_Devices.cs" />
+    <Compile Include="TIA_HMI_Logs.cs" />
+    <Compile Include="TIA_HMI_Tags.cs" />
+    <Compile Include="TIA_TopCtrl_HMI_Message.cs" />
     <Compile Include="TIA_TopCtrl_PLC_Message.cs" />
     <Compile Include="TIA_Project.cs" />
   </ItemGroup>
