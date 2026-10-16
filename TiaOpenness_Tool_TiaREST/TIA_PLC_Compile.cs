@@ -175,13 +175,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Sammelt die Fehler und Warnungen aus dem Meldungsbaum. Gemeldet werden nur die Blätter;
     /// Location enthält die Pfade aller übergeordneten Meldungen.
     /// </summary>
-    static private void CollectMessages(CompilerResult compilerResult, List<CompileMessage> messages) {
+    static internal void CollectMessages(CompilerResult compilerResult, List<CompileMessage> messages) {
       foreach (CompilerResultMessage message in compilerResult.Messages) {
         CollectMessages(message, new List<string>(), messages);
       }
     }
 
-    static private void CollectMessages(CompilerResultMessage message, List<string> parents, List<CompileMessage> messages) {
+    static void CollectMessages(CompilerResultMessage message, List<string> parents, List<CompileMessage> messages) {
       var location = new List<string>(parents);
       if (!string.IsNullOrWhiteSpace(message.Path)) {
         location.Add(message.Path);

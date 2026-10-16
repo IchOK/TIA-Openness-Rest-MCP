@@ -24,6 +24,15 @@ namespace Tophinke.TiaOpenness.Tool.Consts
     public const string Open = "/api/projects/open";
     public const string Save = "/api/projects/save";
     public const string Close = "/api/projects/close";
+    public const string GraphicsList = "/api/project/graphics/list";
+    public const string GraphicsCleanupDuplicates = "/api/project/graphics/cleanup-duplicates";
+  }
+
+  /// <summary>
+  /// Konstanten für die PLC-Geräte-Routen.
+  /// </summary>
+  public static class PlcRoutes {
+    public const string DevicesList = "/api/plc/devices/list";
   }
 
   /// <summary>

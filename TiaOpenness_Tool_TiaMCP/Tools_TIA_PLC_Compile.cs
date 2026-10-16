@@ -35,8 +35,8 @@ public class CompileTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the block or UDT")] string name,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("Device / station name (see tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (see tia_plc_devices_list)")] string deviceItemName,
     [Description("Optional \"Block\" or \"UDT\"; required only if a block and a UDT have the same name")] string? itemType = null) {
     var activity = ToolActivity.Start<CompileTools>($"{name} wird übersetzt");
     try {
@@ -63,8 +63,8 @@ public class CompileTools {
   public static async Task<CallToolResult> CompilePlc(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName) {
+    [Description("Device / station name (see tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (see tia_plc_devices_list)")] string deviceItemName) {
     var activity = ToolActivity.Start<CompileTools>($"PLC {deviceItemName} wird übersetzt");
     try {
       string route = $"{CompileRoutes.Plc}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";

@@ -68,6 +68,7 @@
     <Compile Include="TIA_PLC_Helper_SourceModel.cs" />
     <Compile Include="TIA_PLC_Blocks.cs" />
     <Compile Include="TIA_PLC_Compile.cs" />
+    <Compile Include="TIA_PLC_Devices.cs" />
     <Compile Include="TIA_PLC_UDTs.cs" />
     <Compile Include="TIA_PLC_TagTables.cs" />
     <Compile Include="TIA_PLC_XRefs.cs" />
@@ -78,6 +79,7 @@
     <Compile Include="TIA_TopCtrl_HMI_Message.cs" />
     <Compile Include="TIA_TopCtrl_PLC_Message.cs" />
     <Compile Include="TIA_Project.cs" />
+    <Compile Include="TIA_Project_Graphics.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
