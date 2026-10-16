@@ -36,6 +36,8 @@ if ($LASTEXITCODE -ne 0) { throw "REST build failed." }
 Get-ChildItem "$root\TiaOpenness_Tool_TiaREST\bin\Release" -File |
   Where-Object { $_.Extension -in ".exe", ".dll", ".config", ".json" -or $_.Name -eq "TiaOpenness_Tool_TiaREST.xml" } |
   Copy-Item -Destination $restStage
+Copy-Item -LiteralPath "$root\TiaOpenness_Tool_TiaREST\Cleanup-ProjectGraphics.ps1" -Destination $restStage -Force
+Copy-Item -LiteralPath "$root\TiaOpenness_Tool_TiaREST\Cleanup-ProjectGraphics.cmd" -Destination $restStage -Force
 
 Write-Host "== MCP-Server (Release, self-contained win-x64)"
 dotnet publish "$root\TiaOpenness_Tool_TiaMCP\TiaOpenness_Tool_TiaMCP.csproj" -c Release -r win-x64 --self-contained true -o $mcpStage -nologo -v:m

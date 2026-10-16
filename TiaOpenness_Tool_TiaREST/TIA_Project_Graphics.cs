@@ -9,6 +9,7 @@ using Siemens.Engineering.HmiUnified.UI.Screens;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -80,9 +81,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
       }
 
       return Execute(context, processIdStr, projectName, project => {
+        var progress = new CleanupProgress(request.DryRun);
+        progress.Phase($"Cleanup start: project={project.Name}, DryRun={request.DryRun}, CompareContent={request.CompareContent ?? true}");
+
         var result = new CleanupDuplicatesResult { DryRun = request.DryRun };
         HashSet<string> names = new HashSet<string>(project.Graphics.Select(g => g.Name), StringComparer.OrdinalIgnoreCase);
         result.GraphicCount = names.Count;
+        progress.Phase($"Graphics in collection: {result.GraphicCount}");
 
         bool compareContent = request.CompareContent ?? true;
         Func<string, bool> originalFilter = NameFilter(request.NamePattern);
@@ -96,9 +101,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
         }
         if (nameCandidates.Count == 0) {
           result.Warnings.Add("No name candidates found (names ending with _<number> whose base name exists).");
+          progress.Phase("Done: no name candidates.");
           context.Response.ContentType = "application/json";
           return JsonConvert.SerializeObject(result, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         }
+        progress.Phase($"Name candidates: {nameCandidates.Count}");
 
         var duplicates = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         if (compareContent) {
@@ -109,7 +116,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
             var originalFingerprints = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             int skippedDifferent = 0;
             int exportFailed = 0;
+            int index = 0;
+            progress.Phase($"Content compare: {nameCandidates.Count} candidate(s)");
             foreach (DuplicateMapping candidate in nameCandidates) {
+              index++;
+              progress.Step("Content compare", index, nameCandidates.Count, $"{candidate.Duplicate} -> {candidate.Original}");
               if (!originalFingerprints.TryGetValue(candidate.Original, out string originalFp)) {
                 originalFp = TryFingerprint(project.Graphics.Find(candidate.Original), Path.Combine(tempRoot, "orig-" + SafeFile(candidate.Original)), out string originalError);
                 if (originalFp == null) {
@@ -137,6 +148,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
               duplicates[candidate.Duplicate] = candidate.Original;
               result.Duplicates.Add(candidate);
             }
+            progress.Phase($"Content compare done: matches={duplicates.Count}, different={skippedDifferent}, exportFailed={exportFailed}");
             if (skippedDifferent > 0) {
               result.Warnings.Add($"{skippedDifferent} name candidate(s) differ in image content from their base name and were kept.");
             }
@@ -157,6 +169,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
         result.DuplicateCount = duplicates.Count;
         if (duplicates.Count == 0) {
           result.Warnings.Add("No content-identical duplicate project graphics found.");
+          progress.Phase("Done: no content-identical duplicates.");
           context.Response.ContentType = "application/json";
           return JsonConvert.SerializeObject(result, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
         }
@@ -176,11 +189,20 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
           result.Warnings.Add("No WinCC Unified device in the project; only duplicate graphics in the collection can be deleted.");
         }
 
+        int deviceIndex = 0;
         foreach (UnifiedTarget target in targets) {
-          ScanAndFixDevice(target, duplicates, request.DryRun, result);
+          deviceIndex++;
+          progress.Phase($"Scan/fix references: device {deviceIndex}/{targets.Count} {target.Device.Name}/{target.DeviceItem.Name}");
+          ScanAndFixDevice(target, duplicates, request.DryRun, result, progress);
         }
+        progress.Phase($"References done: usages={result.Usages.Count}");
 
-        foreach (var entry in duplicates.OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase)) {
+        var deleteList = duplicates.OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase).ToList();
+        progress.Phase($"{(request.DryRun ? "Plan delete" : "Delete")}: {deleteList.Count} graphic(s)");
+        int deleteIndex = 0;
+        foreach (var entry in deleteList) {
+          deleteIndex++;
+          progress.Step(request.DryRun ? "Plan delete" : "Delete", deleteIndex, deleteList.Count, entry.Key);
           if (result.Usages.Any(u => string.Equals(u.OldValue, entry.Key, StringComparison.OrdinalIgnoreCase)
                                      && (u.Action == "Error" || u.Action == "SkippedReadOnly"))) {
             result.Warnings.Add($"Graphic {entry.Key} was not deleted because at least one reference could not be updated.");
@@ -233,12 +255,17 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
 
         if (request.CompileAfter && !request.DryRun) {
           result.Compiles = new List<CompileResult>();
+          int compileIndex = 0;
           foreach (UnifiedTarget target in targets) {
+            compileIndex++;
+            progress.Phase($"Compile HMI {compileIndex}/{targets.Count}: {target.Device.Name}/{target.DeviceItem.Name}");
             result.Compiles.Add(CompileHmi(target));
           }
         } else if (request.CompileAfter && request.DryRun) {
           result.Warnings.Add("CompileAfter is ignored with DryRun.");
         }
+
+        progress.Phase($"Cleanup finished: duplicates={result.DuplicateCount}, usages={result.Usages.Count}, deleted={result.DeletedGraphics.Count}");
 
         if (result.Usages.Any(u => u.Error != null) || result.DeletedGraphics.Any(c => c.Error != null)
             || (result.Compiles != null && result.Compiles.Any(c => c.ErrorCount > 0))) {
@@ -267,9 +294,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
       return ResolveOriginal(candidate, names);
     }
 
-    static void ScanAndFixDevice(UnifiedTarget target, Dictionary<string, string> duplicates, bool dryRun, CleanupDuplicatesResult result) {
+    static void ScanAndFixDevice(UnifiedTarget target, Dictionary<string, string> duplicates, bool dryRun, CleanupDuplicatesResult result,
+                                 CleanupProgress progress) {
       HmiSoftware hmi = target.Software;
-      foreach (var screenEntry in AllScreens(hmi)) {
+      List<(HmiScreen Screen, string Path)> screens = AllScreens(hmi).ToList();
+      int index = 0;
+      foreach (var screenEntry in screens) {
+        index++;
+        progress.Step($"Scan {target.Device.Name}", index, screens.Count, screenEntry.Path);
         HmiScreen screen = screenEntry.Screen;
         string screenPath = screenEntry.Path;
         // Nur Eigenschaften des Bildes selbst (z. B. BackGraphic), nicht ScreenItems – die folgen separat.
@@ -277,6 +309,44 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.ProjectGraphics {
         foreach (HmiScreenItemBase item in screen.ScreenItems) {
           FixGraphicProperties(target, screen, screenPath, item.Name, item, duplicates, dryRun, result, recurseChildren: true);
         }
+      }
+    }
+
+    /// <summary>
+    /// Schreibt Fortschritt der Cleanup-Route in die REST-Konsole (gedrosselt, damit das Log lesbar bleibt).
+    /// </summary>
+    sealed class CleanupProgress {
+      readonly Stopwatch _started = Stopwatch.StartNew();
+      readonly Stopwatch _sinceLast = Stopwatch.StartNew();
+      readonly bool _dryRun;
+      const int MinIntervalMs = 2000;
+      const int EveryN = 25;
+
+      public CleanupProgress(bool dryRun) {
+        _dryRun = dryRun;
+      }
+
+      public void Phase(string message) {
+        Console.WriteLine($"[graphics-cleanup] {Elapsed()} {message}");
+        _sinceLast.Restart();
+      }
+
+      public void Step(string phase, int current, int total, string detail) {
+        bool force = current == 1 || current == total || (current % EveryN) == 0;
+        if (!force && _sinceLast.ElapsedMilliseconds < MinIntervalMs) {
+          return;
+        }
+        int percent = total > 0 ? (int)Math.Min(100, Math.Round(100.0 * current / total)) : 0;
+        string dry = _dryRun ? " dry-run" : "";
+        Console.WriteLine($"[graphics-cleanup]{dry} {Elapsed()} {phase}: {current}/{total} ({percent}%) {detail}");
+        _sinceLast.Restart();
+      }
+
+      string Elapsed() {
+        TimeSpan t = _started.Elapsed;
+        return t.TotalHours >= 1
+          ? $"{(int)t.TotalHours:00}:{t.Minutes:00}:{t.Seconds:00}"
+          : $"{t.Minutes:00}:{t.Seconds:00}";
       }
     }
 
