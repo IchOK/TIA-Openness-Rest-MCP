@@ -330,6 +330,76 @@ public class HmiTools {
 
   #endregion
 
+  #region Bilder / ScreenItems
+
+  [McpServerTool(Name = "tia_hmi_screens_list"), Description(
+    "Lists all screens of a WinCC Unified device including folder path (e.g. \"TopCtrl_Visu/00001 Controls/Peripherie\"). " +
+    TargetDescription +
+    "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
+    "On success, Data is ListResult with Items [{ Name, Path }].")]
+  public static async Task<CallToolResult> ListScreens(
+    [Description("The ProcessId of the TIA Portal instance")] int processId,
+    [Description("The name of the project")] string projectName,
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
+    var activity = ToolActivity.Start<HmiTools>("Bilder werden abgerufen");
+    try {
+      using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(
+        BuildRoute(HmiRoutes.ScreensList, processId, projectName, deviceName, deviceItemName));
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
+    } catch (Exception ex) {
+      return activity.Complete(TiaRestClient.FromException(ex));
+    }
+  }
+
+  [McpServerTool(Name = "tia_hmi_screens_items_list"), Description(
+    "Lists screen items on a WinCC Unified screen. UI groups appear as flat items sharing a name prefix (e.g. Analog_State, Analog_BMK). " +
+    TargetDescription +
+    "Response: McpApiResponse with Data ListResult Items [{ Name, Type, ContainedType, TagBindings, Children }].")]
+  public static async Task<CallToolResult> ListScreenItems(
+    [Description("The ProcessId of the TIA Portal instance")] int processId,
+    [Description("The name of the project")] string projectName,
+    [Description("Screen name or path, e.g. Peripherie or TopCtrl_Visu/00001 Controls/Peripherie")] string screen,
+    [Description("Optional name filter with * and ?")] string? namePattern = null,
+    [Description("Optional WinCC Unified device name")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name")] string? deviceItemName = null) {
+    var activity = ToolActivity.Start<HmiTools>($"Bildobjekte {screen} werden abgerufen");
+    try {
+      string route = BuildRoute(HmiRoutes.ScreenItemsList, processId, projectName, deviceName, deviceItemName)
+        + Query("screen", screen) + Query("namePattern", namePattern);
+      using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
+      return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
+    } catch (Exception ex) {
+      return activity.Complete(TiaRestClient.FromException(ex));
+    }
+  }
+
+  [McpServerTool(Name = "tia_hmi_screens_items_copy"), Description(
+    "Copies logical UI groups (items with a shared name prefix) from a source screen to a target screen. " +
+    "For each action: find items named SourceElement or SourceElement_*, copy them to TargetScreen, rename SourceElement→Bmk in object names " +
+    "(e.g. Analog_State → Q1_State), and replace tagPlaceholder with Bmk in tag bindings (e.g. tvPer_SiState → Q1_SiState). " +
+    "Pass multiple actions as an array. " + TargetDescription +
+    "Response: McpApiResponse with Data ScreenItemCopyBatchResult { Results[{ SourceScreen, SourceElement, TargetScreen, Bmk, TagPlaceholder, CreatedName, Action, Renames, TagReplacements, Grouped, GroupWarning, Error }] }. " +
+    "Note: Openness V20 cannot create UI groups (Group > Group); items are copied flat and Grouped=false with GroupWarning. " +
+    "Changes are not saved; use tia_projects_save.")]
+  public static async Task<CallToolResult> CopyScreenItems(
+    [Description("The ProcessId of the TIA Portal instance")] int processId,
+    [Description("The name of the project")] string projectName,
+    [Description("Copy actions: SourceScreen, SourceElement (group prefix / replace text), TargetScreen, Bmk; optional per-action TagPlaceholder overrides the tool parameter")] ScreenItemCopyAction[] actions,
+    [Description("Tag placeholder replaced by Bmk in variable bindings; default \"tvPer\"")] string? tagPlaceholder = "tvPer",
+    [Description("Optional WinCC Unified device name")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name")] string? deviceItemName = null) {
+    var activity = ToolActivity.Start<HmiTools>("Bildobjekte werden kopiert");
+    return activity.Complete(await SendAsync(HttpMethod.Post,
+      BuildRoute(HmiRoutes.ScreenItemsCopy, processId, projectName, deviceName, deviceItemName),
+      new ScreenItemCopyRequest {
+        Actions = actions?.ToList(),
+        TagPlaceholder = string.IsNullOrWhiteSpace(tagPlaceholder) ? "tvPer" : tagPlaceholder.Trim()
+      }));
+  }
+
+  #endregion
+
   internal static string BuildRoute(string baseRoute, int processId, string projectName, string? deviceName, string? deviceItemName, string? kind = null) {
     return $"{baseRoute}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}"
       + Query("deviceName", deviceName) + Query("deviceItemName", deviceItemName) + TiaRestClient.KindQuery(kind);

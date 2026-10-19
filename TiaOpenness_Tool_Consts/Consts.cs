@@ -126,6 +126,9 @@ namespace Tophinke.TiaOpenness.Tool.Consts
     public const string LogsList = "/api/hmi/logs/list";
     public const string LogsPut = "/api/hmi/logs/put";
     public const string LogsDelete = "/api/hmi/logs/delete";
+    public const string ScreensList = "/api/hmi/screens/list";
+    public const string ScreenItemsList = "/api/hmi/screens/items/list";
+    public const string ScreenItemsCopy = "/api/hmi/screens/items/copy";
   }
 
   /// <summary>

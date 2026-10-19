@@ -216,4 +216,76 @@ namespace Tophinke.TiaOpenness.Tool.Types.HMI {
     public string Node { get; set; }
     public string Comment { get; set; }
   }
+
+  /// <summary>
+  /// Ein Unified-Bild (optional mit Gruppenpfad).
+  /// </summary>
+  public class ScreenInfo {
+    public string Name { get; set; }
+    public string Path { get; set; }             // z. B. "0001 Controls/Peripherie"
+  }
+
+  /// <summary>
+  /// Ein ScreenItem (Objekt/Gruppe) auf einem Unified-Bild.
+  /// </summary>
+  public class ScreenItemInfo {
+    public string Name { get; set; }
+    public string Type { get; set; }             // Openness-Typname, z. B. "HmiIOField"
+    public string ContainedType { get; set; }    // z. B. Faceplate-Typ; bei Gruppen ggf. gesetzt
+    public List<string> Compositions { get; set; }
+    public List<string> TagBindings { get; set; } // Variablennamen aus Tag-Dynamisierungen
+    public List<ScreenItemInfo> Children { get; set; }
+  }
+
+  /// <summary>
+  /// Eine Kopieraktion: Gruppe/Element von Quellbild nach Zielbild, Platzhalter → BMK.
+  /// </summary>
+  public class ScreenItemCopyAction {
+    public string SourceScreen { get; set; }     // Bildname oder Pfad, z. B. "Peripherie" bzw. "0001 Controls/Peripherie"
+    public string SourceElement { get; set; }    // Name der zu kopierenden Gruppe/des Elements (= Ersetztext in Namen)
+    public string TargetScreen { get; set; }     // Zielbild (Name oder Pfad)
+    public string Bmk { get; set; }              // BMK; ersetzt SourceElement in Namen und TagPlaceholder in Variablen
+    public string TagPlaceholder { get; set; }   // optional; überschreibt Request.TagPlaceholder / Default "tvPer"
+  }
+
+  /// <summary>
+  /// Request-Body für Batch-Kopieren von ScreenItems.
+  /// </summary>
+  public class ScreenItemCopyRequest {
+    public List<ScreenItemCopyAction> Actions { get; set; }
+    /// <summary>Platzhalter in Tag-Bindungen (Default "tvPer"); pro Action überschreibbar.</summary>
+    public string TagPlaceholder { get; set; }
+  }
+
+  /// <summary>
+  /// Ergebnis einer einzelnen ScreenItem-Kopieraktion.
+  /// </summary>
+  public class ScreenItemCopyResult {
+    public string SourceScreen { get; set; }
+    public string SourceElement { get; set; }
+    public string TargetScreen { get; set; }
+    public string Bmk { get; set; }
+    public string TagPlaceholder { get; set; }
+    public string CreatedName { get; set; }
+    public string Action { get; set; }           // "Copied" oder "Failed"
+    public List<string> Renames { get; set; }
+    public List<string> TagReplacements { get; set; }
+    /// <summary>
+    /// true, wenn die kopierten Objekte per Openness zu einer UI-Gruppe zusammengefasst wurden.
+    /// Unter TIA Openness V20 für WinCC Unified derzeit nicht möglich (API unterstützt kein Group).
+    /// </summary>
+    public bool? Grouped { get; set; }
+    public string GroupWarning { get; set; }
+    public string Error { get; set; }
+  }
+
+  /// <summary>
+  /// Gesamtergebnis eines Batch-Kopierauftrags.
+  /// </summary>
+  public class ScreenItemCopyBatchResult {
+    public string DeviceName { get; set; }
+    public string DeviceItemName { get; set; }
+    public string HmiName { get; set; }
+    public List<ScreenItemCopyResult> Results { get; set; }
+  }
 }

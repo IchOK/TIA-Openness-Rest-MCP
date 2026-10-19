@@ -4,7 +4,7 @@
 # The MCP server is published self-contained (win-x64), so the target machine needs no .NET runtime for it.
 # Requires Inno Setup 6 (winget install JRSoftware.InnoSetup).
 param(
-  [string] $Version = "1.2",
+  [string] $Version = "1.2.1",
   [string] $IsccPath
 )
 
