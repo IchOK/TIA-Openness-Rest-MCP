@@ -7,6 +7,10 @@ namespace Tophinke.TiaOpenness.Tool.Types.Project {
     public int ProcessId { get; set; }
     public string Name { get; set; }
     public string Path { get; set; }
+    /// <summary>
+    /// "Project" | "LocalSession" (siehe ProjectRoutes.Kind*).
+    /// </summary>
+    public string Kind { get; set; }
   }
 
   /// <summary>

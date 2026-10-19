@@ -6,7 +6,7 @@
       "type": "node-terminal",
       "request": "launch",
       "preLaunchTask": "rebuild-rest",
-      "command": "\"${workspaceFolder}/TiaOpenness_Tool_TiaREST/bin/Debug/TiaOpenness_Tool_TiaREST.exe\"",
+      "command": "& \"${workspaceFolder}/TiaOpenness_Tool_TiaREST/bin/Debug/TiaOpenness_Tool_TiaREST.exe\"",
       "cwd": "${workspaceFolder}/TiaOpenness_Tool_TiaREST/bin/Debug"
     },
     {
@@ -21,7 +21,7 @@
       "name": "TiaREST (compound)",
       "type": "node-terminal",
       "request": "launch",
-      "command": "\"${workspaceFolder}/TiaOpenness_Tool_TiaREST/bin/Debug/TiaOpenness_Tool_TiaREST.exe\"",
+      "command": "& \"${workspaceFolder}/TiaOpenness_Tool_TiaREST/bin/Debug/TiaOpenness_Tool_TiaREST.exe\"",
       "cwd": "${workspaceFolder}/TiaOpenness_Tool_TiaREST/bin/Debug",
       "presentation": {
         "hidden": true,

@@ -1,7 +1,8 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Siemens.Engineering;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
+using Siemens.Engineering.Multiuser;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.Tags;
@@ -12,7 +13,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Runtime.Remoting.Contexts;
 using System.Text;
 using System.Threading.Tasks;
 using Tophinke.TiaOpenness.Tool.Consts;
@@ -25,6 +25,32 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
   /// </summary>
   internal sealed class TiaProjectNotFoundException : InvalidOperationException {
     public TiaProjectNotFoundException(string message) : base(message) { }
+  }
+
+  /// <summary>
+  /// Aufgelöstes offenes Projekt: einzelnes <see cref="Project"/> oder Project-Server-<see cref="LocalSession"/> (<see cref="MultiuserProject"/>).
+  /// </summary>
+  internal sealed class ResolvedProject {
+    public ProjectBase Project { get; set; }
+    public LocalSession LocalSession { get; set; }
+    /// <summary>ProjectRoutes.KindProject | KindLocalSession</summary>
+    public string Kind { get; set; }
+
+    public void Save() {
+      if (LocalSession != null) {
+        LocalSession.Save();
+      } else {
+        ((Project)Project).Save();
+      }
+    }
+
+    public void Close() {
+      if (LocalSession != null) {
+        LocalSession.Close();
+      } else {
+        ((Project)Project).Close();
+      }
+    }
   }
 
   /// <summary>
@@ -42,15 +68,30 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     private TiaConnectionManager() { }
 
     /// <summary>
-    /// Führt eine Aktion mit einem Projekt in einer eigenen Openness-Sitzung aus. Meldet TIA Portal das Instanzlimit
-    /// der Sitzung, wird die Aktion einmal mit einer neuen Sitzung wiederholt.
+    /// Führt eine Aktion mit einem Projekt bzw. einer Project-Server-LocalSession in einer eigenen Openness-Sitzung aus.
+    /// Meldet TIA Portal das Instanzlimit der Sitzung, wird die Aktion einmal mit einer neuen Sitzung wiederholt.
     /// </summary>
     /// <typeparam name="T">Rückgabewert der Aktion</typeparam>
     /// <param name="processIdStr">Prozess-ID</param>
-    /// <param name="projectName">Name des Projekts</param>
+    /// <param name="projectName">Name des Projekts bzw. der LocalSession-Projektdatei</param>
     /// <param name="action">Aktion, die mit dem Projekt ausgeführt wird; Openness-Objekte dürfen sie nicht überleben</param>
     /// <returns>Rückgabewert der Aktion</returns>
-    public T ExecuteWithProject<T>(string processIdStr, string projectName, Func<Project, T> action) {
+    public T ExecuteWithProject<T>(string processIdStr, string projectName, Func<ProjectBase, T> action, string kind = null) {
+      return ExecuteWithResolvedProject(processIdStr, projectName, resolved => action(resolved.Project), kind);
+    }
+
+    /// <summary>
+    /// Wie <see cref="ExecuteWithProject{T}(string,string,Func{ProjectBase,T},string)"/>, liest optional <c>kind</c> aus der Query.
+    /// </summary>
+    public T ExecuteWithProject<T>(HttpListenerContext context, string processIdStr, string projectName, Func<ProjectBase, T> action) {
+      return ExecuteWithProject(processIdStr, projectName, action, context.Request.QueryString["kind"]);
+    }
+
+    /// <summary>
+    /// Wie ExecuteWithProject, liefert zusätzlich die LocalSession für Speichern/Schließen von Project-Server-Sessions.
+    /// </summary>
+    /// <param name="kind">Optional: Project / LocalSession zur Disambiguierung</param>
+    public T ExecuteWithResolvedProject<T>(string processIdStr, string projectName, Func<ResolvedProject, T> action, string kind = null) {
       if (string.IsNullOrEmpty(processIdStr) || string.IsNullOrEmpty(projectName)) {
         throw new InvalidOperationException("Error: Process ID and project name must be provided.");
       }
@@ -59,10 +100,83 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
 
       return ExecuteWithPortal(processId, tia => {
-        var project = tia.Projects.FirstOrDefault(p => p.Name == projectName);
-        if (project == null) throw new TiaProjectNotFoundException($"Project {projectName} nicht gefunden.");
-        return action(project);
+        ResolvedProject resolved = ResolveOpenProject(tia, projectName, kind);
+        if (resolved == null) {
+          throw new TiaProjectNotFoundException(
+            $"Project {projectName} nicht gefunden (weder unter Projects noch unter LocalSessions"
+            + (string.IsNullOrEmpty(kind) ? "" : $", kind={kind}") + ").");
+        }
+        return action(resolved);
       });
+    }
+
+    /// <summary>
+    /// Sucht ein geöffnetes Einzelprojekt oder eine Project-Server-LocalSession.
+    /// </summary>
+    static internal ResolvedProject ResolveOpenProject(TiaPortal tia, string projectName, string kind = null) {
+      string wantKind = NormalizeKind(kind);
+      var candidates = new List<ResolvedProject>();
+
+      if (wantKind == null || wantKind == ProjectRoutes.KindProject) {
+        foreach (Project project in tia.Projects) {
+          if (MatchesProject(project, projectName)) {
+            candidates.Add(new ResolvedProject { Project = project, Kind = ProjectRoutes.KindProject });
+          }
+        }
+      }
+
+      if (wantKind == null || wantKind == ProjectRoutes.KindLocalSession) {
+        foreach (LocalSession session in tia.LocalSessions) {
+          MultiuserProject multiuser;
+          try {
+            multiuser = session.Project;
+          } catch {
+            continue;
+          }
+          if (multiuser == null || !MatchesProject(multiuser, projectName)) {
+            continue;
+          }
+          candidates.Add(new ResolvedProject {
+            Project = multiuser,
+            LocalSession = session,
+            Kind = ProjectRoutes.KindLocalSession
+          });
+        }
+      }
+
+      if (candidates.Count == 0) {
+        return null;
+      }
+      if (candidates.Count == 1 || wantKind != null) {
+        return candidates[0];
+      }
+      // Bei Mehrdeutigkeit: LocalSession vor Einzelprojekt.
+      return candidates.FirstOrDefault(c => c.Kind == ProjectRoutes.KindLocalSession)
+        ?? candidates[0];
+    }
+
+    static string NormalizeKind(string kind) {
+      if (string.IsNullOrWhiteSpace(kind)) {
+        return null;
+      }
+      if (string.Equals(kind, ProjectRoutes.KindProject, StringComparison.OrdinalIgnoreCase)) {
+        return ProjectRoutes.KindProject;
+      }
+      if (string.Equals(kind, ProjectRoutes.KindLocalSession, StringComparison.OrdinalIgnoreCase)) {
+        return ProjectRoutes.KindLocalSession;
+      }
+      return kind.Trim();
+    }
+
+    static bool MatchesProject(ProjectBase project, string projectName) {
+      if (string.Equals(project.Name, projectName, StringComparison.OrdinalIgnoreCase)) {
+        return true;
+      }
+      if (project.Path == null) {
+        return false;
+      }
+      return string.Equals(Path.GetFileNameWithoutExtension(project.Path.Name), projectName, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(project.Path.FullName, projectName, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -137,45 +251,89 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
   /// </summary>
   static internal class cTiaProject {
     /// <summary>
-    /// Gibt eine Liste aller offenen TIA Portal Instanzen und deren Projekte zurück.
+    /// Gibt eine Liste aller offenen TIA-Projekte und Project-Server-LocalSessions zurück.
+    /// Bei .amc per Attach (LocalSessions); sonst ProjectPath (vermeidet langsame Attach-Aufrufe).
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <returns>JSON-String mit der Liste der offenen TIA Portal Instanzen und deren Projekte oder Fehlermeldung</returns>
+    /// <returns>JSON-String mit der Liste oder Fehlermeldung</returns>
     [RestRoute(ProjectRoutes.List)]
     static public string List(HttpListenerContext context) {
       var processes = TiaPortal.GetProcesses();
       var projectInfos = new List<Info>();
-      string errorMessage = string.Empty;
+      var warnings = new List<string>();
 
       foreach (var process in processes) {
+        FileInfo projectFile = null;
         try {
-          using (var tia = process.Attach()) {
-            foreach (var proj in tia.Projects) {
-              projectInfos.Add(new Info {
-                ProcessId = process.Id,
-                Name = proj.Name,
-                Path = proj.Path.ToString()
-              });
-            }
-          }
+          projectFile = process.ProjectPath;
         } catch (Exception ex) {
-          Console.Error.WriteLine($"TIA Attach failed for process {process.Id}: {ex.GetType().Name}: {ex.Message}");
-          errorMessage = $"Error: TIA Attach denied/failed for process {process.Id}: {ex.Message}";
+          warnings.Add($"Process {process.Id}: ProjectPath unavailable ({ex.GetType().Name}: {ex.Message}).");
+          continue;
         }
+        if (projectFile == null) {
+          continue;
+        }
+
+        bool multiuserFile = (projectFile.Extension ?? "").StartsWith(".amc", StringComparison.OrdinalIgnoreCase);
+        if (multiuserFile) {
+          try {
+            using (var tia = process.Attach()) {
+              int before = projectInfos.Count;
+              int index = 0;
+              foreach (LocalSession session in tia.LocalSessions) {
+                MultiuserProject multiuser;
+                try {
+                  multiuser = session.Project;
+                } catch (Exception ex) {
+                  warnings.Add($"Process {process.Id}: LocalSession[{index}].Project unavailable ({ex.Message}).");
+                  index++;
+                  continue;
+                }
+                index++;
+                if (multiuser == null) {
+                  continue;
+                }
+                projectInfos.Add(new Info {
+                  ProcessId = process.Id,
+                  Name = multiuser.Name,
+                  Path = multiuser.Path != null ? multiuser.Path.FullName : null,
+                  Kind = ProjectRoutes.KindLocalSession
+                });
+              }
+              if (projectInfos.Count > before) {
+                continue;
+              }
+            }
+          } catch (Exception ex) {
+            warnings.Add($"Process {process.Id}: Attach failed ({ex.GetType().Name}: {ex.Message}).");
+            Console.Error.WriteLine($"TIA Attach failed for process {process.Id}: {ex.GetType().Name}: {ex.Message}");
+          }
+        }
+
+        projectInfos.Add(new Info {
+          ProcessId = process.Id,
+          Name = Path.GetFileNameWithoutExtension(projectFile.Name),
+          Path = projectFile.FullName,
+          Kind = multiuserFile ? ProjectRoutes.KindLocalSession : ProjectRoutes.KindProject
+        });
+      }
+
+      foreach (string warning in warnings) {
+        Console.Error.WriteLine(warning);
       }
 
       if (projectInfos.Count == 0) {
-        if (string.IsNullOrEmpty(errorMessage)) {
-          errorMessage = "Error: No TIA Portal instances with open projects found.";
-        }
+        string errorMessage = warnings.Count > 0
+          ? "Error: No open projects found. " + string.Join(" ", warnings)
+          : "Error: No TIA Portal instances with open projects found.";
         Console.Error.WriteLine(errorMessage);
         context.Response.StatusCode = (int)HttpStatusCode.NotFound;
         context.Response.ContentType = "text/plain";
         return errorMessage;
-      } else {
-        context.Response.ContentType = "application/json";
-        return JsonConvert.SerializeObject(projectInfos);
       }
+
+      context.Response.ContentType = "application/json";
+      return JsonConvert.SerializeObject(projectInfos, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore });
     }
 
     /// <summary>
@@ -184,10 +342,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// (mit Oberfläche, Version aus appsettings.json) gestartet. Ist das Projekt bereits geöffnet, wird diese Instanz gemeldet.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="path">Absoluter Pfad der Projektdatei oder des Projektarchivs</query>
+    /// <query name="path">Absoluter Dateisystem-Pfad zur TIA-Projektdatei (.ap…) oder zum Projektarchiv (.zap…) auf dem Rechner mit TIA Portal</query>
     /// <query name="processId">Optional: Prozess-ID der TIA Portal-Instanz; sie darf kein Projekt geöffnet haben</query>
     /// <query name="upgrade">Optional: true öffnet bzw. dearchiviert ein Projekt einer älteren TIA-Version mit Hochrüstung</query>
-    /// <query name="targetDirectory">Nur für Archive: absoluter Zielordner für das dearchivierte Projekt</query>
+    /// <query name="targetDirectory">Nur für Archive: absoluter Dateisystem-Zielordner, in den das Projekt dearchiviert wird (nicht TIA-intern)</query>
     /// <query name="startTimeoutSeconds">Optional: maximale Wartezeit auf den Start von TIA Portal (Standard 300)</query>
     /// <returns>JSON-String mit OpenResult oder Fehlermeldung</returns>
     [RestRoute(ProjectRoutes.Open, "POST")]
@@ -288,17 +446,25 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="kind">Optional: Project oder LocalSession zur Disambiguierung</query>
     /// <returns>JSON-String mit SaveResult oder Fehlermeldung</returns>
     [RestRoute(ProjectRoutes.Save, "POST")]
     static public string Save(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       try {
-        SaveResult result = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        SaveResult result = TiaConnectionManager.Instance.ExecuteWithResolvedProject(processIdStr, projectName, resolved => {
+          ProjectBase project = resolved.Project;
           bool modified = project.IsModified;
-          project.Save();
-          return new SaveResult { ProcessId = int.Parse(processIdStr), Name = project.Name, Path = project.Path.FullName, WasModified = modified };
-        });
+          resolved.Save();
+          return new SaveResult {
+            ProcessId = int.Parse(processIdStr),
+            Name = project.Name,
+            Path = project.Path != null ? project.Path.FullName : null,
+            WasModified = modified,
+            Kind = resolved.Kind
+          };
+        }, context.Request.QueryString["kind"]);
         context.Response.ContentType = "application/json";
         return JsonConvert.SerializeObject(result);
       } catch (TiaProjectNotFoundException ex) {
@@ -315,6 +481,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="kind">Optional: Project oder LocalSession zur Disambiguierung</query>
     /// <query name="save">Optional: true speichert das Projekt vor dem Schließen</query>
     /// <query name="discardChanges">Optional: true schließt auch bei ungespeicherten Änderungen ohne zu speichern</query>
     /// <returns>JSON-String mit CloseResult oder Fehlermeldung</returns>
@@ -328,20 +495,26 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: save and discardChanges cannot both be true.");
       }
       try {
-        CloseResult result = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        CloseResult result = TiaConnectionManager.Instance.ExecuteWithResolvedProject(processIdStr, projectName, resolved => {
+          ProjectBase project = resolved.Project;
           bool modified = project.IsModified;
-          var closeResult = new CloseResult { ProcessId = int.Parse(processIdStr), Name = project.Name, Path = project.Path.FullName };
+          var closeResult = new CloseResult {
+            ProcessId = int.Parse(processIdStr),
+            Name = project.Name,
+            Path = project.Path != null ? project.Path.FullName : null,
+            Kind = resolved.Kind
+          };
           if (modified && !save && !discardChanges) {
             return null;
           }
           if (save) {
-            project.Save();
+            resolved.Save();
             closeResult.Saved = true;
           }
           closeResult.DiscardedChanges = modified && !save;
-          project.Close();
+          resolved.Close();
           return closeResult;
-        });
+        }, context.Request.QueryString["kind"]);
         if (result == null) {
           return ErrorResponse(context, HttpStatusCode.Conflict,
             $"Error: Project {projectName} has unsaved changes. Pass save=true to save them or discardChanges=true to discard them.");
@@ -425,7 +598,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     /// <param name="deviceItemName">Name des Geräteelements</param>
     /// <param name="plcSoftware">Out-Parameter für die PLC-Software</param>
     /// <returns>Fehlermeldung oder null bei Erfolg</returns>
-    static public string GetPlcSoftware(Project project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware) {
+    static public string GetPlcSoftware(ProjectBase project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware) {
       plcSoftware = null;
       if (project == null) {
         return "Error: Project must be provided.";
@@ -463,7 +636,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     }
 
 
-    static public string GetPlcSystemBlockGroup(Project project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup) {
+    static public string GetPlcSystemBlockGroup(ProjectBase project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware, out PlcBlockGroup plcBlockGroup) {
       plcBlockGroup = null;
       plcSoftware = null;
       if (project == null) {
@@ -503,7 +676,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
-    static public string GetPlcSystemTypeGroup(Project project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware, out PlcTypeGroup plcTypeGroup) {
+    static public string GetPlcSystemTypeGroup(ProjectBase project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware, out PlcTypeGroup plcTypeGroup) {
       plcTypeGroup = null;
       plcSoftware = null;
       if (project == null) {
@@ -543,7 +716,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       }
     }
 
-    static public string GetPlcTagTableGroup(Project project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup) {
+    static public string GetPlcTagTableGroup(ProjectBase project, string deviceName, string deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup) {
       plcTagTableGroup = null;
       plcSoftware = null;
       if (project == null) {

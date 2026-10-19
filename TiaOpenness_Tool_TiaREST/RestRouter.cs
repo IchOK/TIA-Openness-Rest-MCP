@@ -79,10 +79,17 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     }
 
     /// <summary>
-    /// Bearbeitet eine Anfrage: API-Key prüfen, Route suchen, HTTP-Methode prüfen, Handler aufrufen.
+    /// Bearbeitet eine Anfrage: optional Web-UI, dann API-Key prüfen, Route suchen, Handler aufrufen.
     /// </summary>
-    /// <returns>Antworttext; Statuscode und ContentType sind gesetzt</returns>
+    /// <returns>
+    /// Antworttext; Statuscode und ContentType sind gesetzt.
+    /// null, wenn die Antwort bereits geschrieben wurde (statische Dateien).
+    /// </returns>
     static public string Dispatch(HttpListenerContext context, string apiKey) {
+      if (RestStaticFiles.TryServe(context)) {
+        return null;
+      }
+
       string path = context.Request.Url.LocalPath;
       _routes.TryGetValue(path, out RestRoute route);
 

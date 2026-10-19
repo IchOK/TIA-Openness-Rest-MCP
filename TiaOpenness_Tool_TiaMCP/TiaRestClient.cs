@@ -36,6 +36,13 @@ public static class TiaRestClient {
   public static HttpClient LongRunningClient => _longRunningClient;
 
   /// <summary>
+  /// Optional project kind query ("&amp;kind=LocalSession" / Project); empty if omitted.
+  /// </summary>
+  public static string KindQuery(string? kind) {
+    return string.IsNullOrWhiteSpace(kind) ? "" : $"&kind={Uri.EscapeDataString(kind.Trim())}";
+  }
+
+  /// <summary>
   /// Builds the folder filter query part ("&amp;path=A&amp;path=B"); empty if no folder is given.
   /// </summary>
   public static string PathQuery(string[]? path) {

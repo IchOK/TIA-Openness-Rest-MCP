@@ -4,7 +4,7 @@
 # The MCP server is published self-contained (win-x64), so the target machine needs no .NET runtime for it.
 # Requires Inno Setup 6 (winget install JRSoftware.InnoSetup).
 param(
-  [string] $Version = "1.0.0",
+  [string] $Version = "1.2",
   [string] $IsccPath
 )
 
@@ -36,8 +36,11 @@ if ($LASTEXITCODE -ne 0) { throw "REST build failed." }
 Get-ChildItem "$root\TiaOpenness_Tool_TiaREST\bin\Release" -File |
   Where-Object { $_.Extension -in ".exe", ".dll", ".config", ".json" -or $_.Name -eq "TiaOpenness_Tool_TiaREST.xml" } |
   Copy-Item -Destination $restStage
-Copy-Item -LiteralPath "$root\TiaOpenness_Tool_TiaREST\Cleanup-ProjectGraphics.ps1" -Destination $restStage -Force
-Copy-Item -LiteralPath "$root\TiaOpenness_Tool_TiaREST\Cleanup-ProjectGraphics.cmd" -Destination $restStage -Force
+$wwwrootSrc = Join-Path "$root\TiaOpenness_Tool_TiaREST\bin\Release" "wwwroot"
+if (-not (Test-Path -LiteralPath $wwwrootSrc)) {
+  throw "wwwroot missing in Release output (Web UI). Rebuild REST first."
+}
+Copy-Item -LiteralPath $wwwrootSrc -Destination (Join-Path $restStage "wwwroot") -Recurse -Force
 
 Write-Host "== MCP-Server (Release, self-contained win-x64)"
 dotnet publish "$root\TiaOpenness_Tool_TiaMCP\TiaOpenness_Tool_TiaMCP.csproj" -c Release -r win-x64 --self-contained true -o $mcpStage -nologo -v:m

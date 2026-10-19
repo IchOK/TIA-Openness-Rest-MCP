@@ -5,7 +5,7 @@
 ; und in TiaREST\appsettings.json und TiaMCP\appsettings.json geschrieben.
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.2"
 #endif
 #ifndef StageDir
   #define StageDir "stage"

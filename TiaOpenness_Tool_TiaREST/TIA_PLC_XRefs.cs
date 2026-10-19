@@ -21,8 +21,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <query name="objectName">Name des Objekts</query>
     /// <query name="objectKind">Art des Objekts: Block, DbTag, Tag, UDT oder SystemConstant</query>
     /// <query name="tagName">Name des Tags innerhalb des Datenbausteins (nur bei objectKind DbTag)</query>
@@ -57,7 +57,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       }
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           string errorMessage = cTiaProject.GetPlcSoftware(project, deviceName, deviceItemName, out PlcSoftware plcSoftware);
           if (errorMessage != null) {
             Console.Error.WriteLine(errorMessage);

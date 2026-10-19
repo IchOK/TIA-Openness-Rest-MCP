@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 using Tophinke.TiaOpenness.Tool.Types.PLC.Library;
@@ -85,7 +85,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
   /// Die Dateien werden aus Root\Projekt\Ordnerpfad gelesen.
   /// </summary>
   public class PutFileRequest {
-    public string RootDirectory { get; set; }  // absoluter Pfad des Wurzelverzeichnisses
+    public string RootDirectory { get; set; }  // absoluter Dateisystem-Pfad (TIA/REST-Rechner) als Basis für Export/Import; Dateien unter Root\Projekt\Ordnerpfad
     public string[] Path { get; set; }         // Zielordner; null = bisheriger Ordner bzw. Wurzelordner
     public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"; leer = aus den vorhandenen Dateien ableiten
     public int? BlockNumber { get; set; }      // gewünschte Nummer; null = bisherige Nummer bzw. automatisch

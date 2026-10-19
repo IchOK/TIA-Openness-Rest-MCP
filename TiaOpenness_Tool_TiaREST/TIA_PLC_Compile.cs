@@ -32,8 +32,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="name">Name des Bausteins oder Datentyps</query>
     /// <query name="itemType">Optional "Block" oder "UDT"; ohne Angabe wird zuerst ein Baustein, dann ein Datentyp gesucht</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <returns>JSON-String mit CompileResult oder Fehlermeldung</returns>
     [RestRoute(CompileRoutes.Item, "POST")]
     static public string Item(HttpListenerContext context) {
@@ -54,7 +54,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       }
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           var errorMessage = cTiaProject.GetPlcSoftware(project, deviceName, deviceItemName, out PlcSoftware plcSoftware);
           if (errorMessage != null) {
             return ErrorResponse(context, HttpStatusCode.NotFound, errorMessage);
@@ -117,8 +117,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <returns>JSON-String mit CompileResult oder Fehlermeldung</returns>
     [RestRoute(CompileRoutes.Plc, "POST")]
     static public string Plc(HttpListenerContext context) {
@@ -128,7 +128,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       string deviceItemName = context.Request.QueryString["deviceItemName"];
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           var errorMessage = cTiaProject.GetPlcSoftware(project, deviceName, deviceItemName, out PlcSoftware plcSoftware);
           if (errorMessage != null) {
             return ErrorResponse(context, HttpStatusCode.NotFound, errorMessage);

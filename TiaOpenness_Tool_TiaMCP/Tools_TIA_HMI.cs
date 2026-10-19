@@ -34,10 +34,12 @@ public class HmiTools {
     "TagTableCount, TagCount, DiscreteAlarmCount, AnalogAlarmCount, AlarmClassCount, DataLogCount, AlarmLogCount, ScreenCount.")]
   public static async Task<CallToolResult> ListDevices(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
-    [Description("The name of the project")] string projectName) {
+    [Description("The name of the project")] string projectName,
+    [Description("Optional: Project or LocalSession when names collide")] string? kind = null) {
     var activity = ToolActivity.Start<HmiTools>("Unified-Geräte werden abgerufen");
     try {
-      string route = $"{HmiRoutes.DevicesList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}";
+      string route = $"{HmiRoutes.DevicesList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}"
+        + TiaRestClient.KindQuery(kind);
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
@@ -60,8 +62,8 @@ public class HmiTools {
   public static async Task<CallToolResult> ListTags(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null,
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null,
     [Description("Optional: only tags of this tag table")] string? tagTableName = null,
     [Description("Optional name filter with * and ?, e.g. \"Motor*\"")] string? namePattern = null) {
     var activity = ToolActivity.Start<HmiTools>("HMI-Variablen werden abgerufen");
@@ -93,8 +95,8 @@ public class HmiTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Tags to create or update; omitted fields stay unchanged")] TagInfo[] tags,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("HMI-Variablen werden geschrieben");
     return activity.Complete(await SendAsync(HttpMethod.Put, BuildRoute(HmiRoutes.TagsPut, processId, projectName, deviceName, deviceItemName),
       new TagPutRequest { Tags = tags?.ToList() }));
@@ -107,8 +109,8 @@ public class HmiTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Names of the tags to delete")] string[] names,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("HMI-Variablen werden gelöscht");
     return activity.Complete(await SendAsync(HttpMethod.Post, BuildRoute(HmiRoutes.TagsDelete, processId, projectName, deviceName, deviceItemName),
       new DeleteRequest { Names = names?.ToList() }));
@@ -122,10 +124,10 @@ public class HmiTools {
   public static async Task<CallToolResult> GetTagsFile(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<HmiName>\\Tags\\<table>")] string rootDirectory,
     [Description("Optional: export only this tag table")] string? tagTableName = null,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("HMI-Variablen werden exportiert");
     try {
       string route = BuildRoute(HmiRoutes.TagsGetFile, processId, projectName, deviceName, deviceItemName)
@@ -146,10 +148,10 @@ public class HmiTools {
   public static async Task<CallToolResult> PutTagsFile(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("Absolute root directory of the export, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base (same layout as export), e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<HmiName>\\Tags\\<table>")] string rootDirectory,
     [Description("Optional: import only the folder of this tag table")] string? tagTableName = null,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("HMI-Variablen werden importiert");
     return activity.Complete(await SendAsync(HttpMethod.Put,
       BuildRoute(HmiRoutes.TagsPutFile, processId, projectName, deviceName, deviceItemName) + Query("tagTableName", tagTableName),
@@ -172,8 +174,8 @@ public class HmiTools {
   public static async Task<CallToolResult> ListAlarms(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null,
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null,
     [Description("Optional: \"Discrete\" or \"Analog\"; default both")] string? kind = null,
     [Description("Optional name filter with * and ?")] string? namePattern = null) {
     var activity = ToolActivity.Start<HmiTools>("HMI-Meldungen werden abgerufen");
@@ -202,8 +204,8 @@ public class HmiTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Alarms to create or update; omitted fields stay unchanged")] AlarmInfo[] alarms,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("HMI-Meldungen werden geschrieben");
     return activity.Complete(await SendAsync(HttpMethod.Put, BuildRoute(HmiRoutes.AlarmsPut, processId, projectName, deviceName, deviceItemName),
       new AlarmPutRequest { Alarms = alarms?.ToList() }));
@@ -216,8 +218,8 @@ public class HmiTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Names of the alarms to delete")] string[] names,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("HMI-Meldungen werden gelöscht");
     return activity.Complete(await SendAsync(HttpMethod.Post, BuildRoute(HmiRoutes.AlarmsDelete, processId, projectName, deviceName, deviceItemName),
       new DeleteRequest { Names = names?.ToList() }));
@@ -232,8 +234,8 @@ public class HmiTools {
   public static async Task<CallToolResult> ListAlarmClasses(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("Meldeklassen werden abgerufen");
     try {
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(BuildRoute(HmiRoutes.AlarmClassesList, processId, projectName, deviceName, deviceItemName));
@@ -251,8 +253,8 @@ public class HmiTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Alarm classes to create or update; omitted fields stay unchanged")] AlarmClassInfo[] alarmClasses,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("Meldeklassen werden geschrieben");
     return activity.Complete(await SendAsync(HttpMethod.Put, BuildRoute(HmiRoutes.AlarmClassesPut, processId, projectName, deviceName, deviceItemName),
       new AlarmClassPutRequest { AlarmClasses = alarmClasses?.ToList() }));
@@ -265,8 +267,8 @@ public class HmiTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Names of the alarm classes to delete")] string[] names,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("Meldeklassen werden gelöscht");
     return activity.Complete(await SendAsync(HttpMethod.Post, BuildRoute(HmiRoutes.AlarmClassesDelete, processId, projectName, deviceName, deviceItemName),
       new DeleteRequest { Names = names?.ToList() }));
@@ -285,8 +287,8 @@ public class HmiTools {
   public static async Task<CallToolResult> ListLogs(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("Archive werden abgerufen");
     try {
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(BuildRoute(HmiRoutes.LogsList, processId, projectName, deviceName, deviceItemName));
@@ -306,8 +308,8 @@ public class HmiTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Logs to create or update; omitted fields stay unchanged")] LogInfo[] logs,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("Archive werden geschrieben");
     return activity.Complete(await SendAsync(HttpMethod.Put, BuildRoute(HmiRoutes.LogsPut, processId, projectName, deviceName, deviceItemName),
       new LogPutRequest { Logs = logs?.ToList() }));
@@ -319,8 +321,8 @@ public class HmiTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Names of the logs to delete")] string[] names,
-    [Description("Optional Unified device name")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null) {
+    [Description("Optional WinCC Unified device name (DeviceName from tia_hmi_devices_list)")] string? deviceName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null) {
     var activity = ToolActivity.Start<HmiTools>("Archive werden gelöscht");
     return activity.Complete(await SendAsync(HttpMethod.Post, BuildRoute(HmiRoutes.LogsDelete, processId, projectName, deviceName, deviceItemName),
       new DeleteRequest { Names = names?.ToList() }));
@@ -328,9 +330,9 @@ public class HmiTools {
 
   #endregion
 
-  internal static string BuildRoute(string baseRoute, int processId, string projectName, string? deviceName, string? deviceItemName) {
+  internal static string BuildRoute(string baseRoute, int processId, string projectName, string? deviceName, string? deviceItemName, string? kind = null) {
     return $"{baseRoute}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}"
-      + Query("deviceName", deviceName) + Query("deviceItemName", deviceItemName);
+      + Query("deviceName", deviceName) + Query("deviceItemName", deviceItemName) + TiaRestClient.KindQuery(kind);
   }
 
   static string Query(string name, string? value) {

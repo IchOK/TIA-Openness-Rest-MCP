@@ -34,7 +34,7 @@ public class HmiMessageTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Optional Unified device name (see tia_hmi_devices_list); may be omitted if there is only one")] string? deviceName = null,
-    [Description("Optional Unified device item name")] string? deviceItemName = null,
+    [Description("Optional WinCC Unified device item name (DeviceItemName from tia_hmi_devices_list)")] string? deviceItemName = null,
     [Description("Optional HMI connection to the PLC; default: the only connection with a partner PLC")] string? connectionName = null,
     [Description("Optional PLC device name; default: station of the connection")] string? plcDeviceName = null,
     [Description("Optional PLC device item name; default: partner of the connection")] string? plcDeviceItemName = null,

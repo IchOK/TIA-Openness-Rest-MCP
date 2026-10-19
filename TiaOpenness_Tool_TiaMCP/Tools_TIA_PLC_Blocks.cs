@@ -67,7 +67,7 @@ public class BlockTools {
       "TechnologicalInstanceDB (technological object instance DB). " +
       "Example: FC,FB,GlobalDB")] string? filterTypes = null,
     [Description("Optional comma-separated filter of programming languages (ProgrammingLanguage), e.g. \"SCL,LAD\"")] string? filterLanguages = null,
-    [Description("Optional block folder as folder names from the root, e.g. [\"TopCtrl_Func\", \"Basis\"]; includes subfolders")] string[]? path = null) {
+    [Description("Optional TIA block folder path (not filesystem): folder names from the PLC block root, e.g. [\"TopCtrl_Func\", \"Basis\"]; includes subfolders")] string[]? path = null) {
 
     var activity = ToolActivity.Start<BlockTools>("Bausteine werden abgerufen");
     try {
@@ -114,8 +114,8 @@ public class BlockTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the block")] string blockName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
     [Description("Optional export format: \"SD\" or \"XML\". Omit for SD where supported with XML as fallback")] string? format = null) {
     var activity = ToolActivity.Start<BlockTools>($"Baustein {blockName} wird abgerufen");
     try {
@@ -160,12 +160,12 @@ public class BlockTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the block")] string blockName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
     [Description("Complete block text in the given format (Content from tia_plc_blocks_get, modified as needed)")] string content,
     [Description("MultiLingualText from tia_plc_blocks_get (.s7res text with the texts for all S7_MLC IDs in Content); required for \"SimaticData/SD\" if Content references IDs, otherwise null; must be null for \"SimaticML/XML\"")] string? multiLingualText,
     [Description("Format from tia_plc_blocks_get: \"SimaticData/SD\" or \"SimaticML/XML\"")] string format,
-    [Description("Optional target folder as user group names from the root, e.g. [\"Plant\", \"Unit1\"]; empty array = root folder")] string[]? path = null,
+    [Description("Optional TIA target folder (not filesystem): user group names from the PLC root, e.g. [\"Plant\", \"Unit1\"]; empty array = root folder")] string[]? path = null,
     [Description("Optional block number; omit to keep the number of an existing block or to let TIA assign one for a new block")] int? blockNumber = null,
     [Description("Only for instances of library types: \"InTest\" (write as in-test version) or \"Release\" (write and release); omit for normal blocks")] string? libraryMode = null,
     [Description("Only with libraryMode \"Release\": version number to release, e.g. \"0.1.37\"; omit to use the number of the in-test version")] string? libraryVersion = null,
@@ -219,9 +219,9 @@ public class BlockTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the block")] string blockName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"; files go to <rootDirectory>\\<project name>\\<block folder path>")] string rootDirectory) {
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files are written under <rootDirectory>\\<project name>\\<TIA block folder path>")] string rootDirectory) {
     var activity = ToolActivity.Start<BlockTools>($"Baustein {blockName} wird in Dateien exportiert");
     try {
       string safeProjectName = Uri.EscapeDataString(projectName);
@@ -260,11 +260,11 @@ public class BlockTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the block")] string blockName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory of the files, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<folder path>")] string rootDirectory,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
     [Description("Optional \"SimaticData/SD\" or \"SimaticML/XML\"; omit to derive it from the existing files")] string? format = null,
-    [Description("Optional folder as user group names from the root, e.g. [\"Plant\", \"Unit1\"]; selects both the file subdirectory and the target folder in the project; empty array = root folder")] string[]? path = null,
+    [Description("Optional TIA folder path (not filesystem): user group names from the PLC root, e.g. [\"Plant\", \"Unit1\"]; selects both the filesystem subdirectory under rootDirectory and the TIA target folder; empty = root")] string[]? path = null,
     [Description("Optional block number; omit to keep the number of an existing block or to let TIA assign one for a new block")] int? blockNumber = null,
     [Description("Only for instances of library types: \"InTest\" (write as in-test version) or \"Release\" (write and release); omit for normal blocks")] string? libraryMode = null,
     [Description("Only with libraryMode \"Release\": version number to release, e.g. \"0.1.37\"; omit to use the number of the in-test version")] string? libraryVersion = null,
@@ -306,10 +306,10 @@ public class BlockTools {
   public static async Task<CallToolResult> GetBlockDir(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"; files go to <rootDirectory>\\<project name>\\<block folder path>")] string rootDirectory,
-    [Description("Optional block folder as folder names from the root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; omit for the root folder")] string[]? path = null,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files are written under <rootDirectory>\\<project name>\\<TIA block folder path>")] string rootDirectory,
+    [Description("Optional TIA block folder path (not filesystem): folder names from the PLC block root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; omit for the root folder")] string[]? path = null,
     [Description("Include subfolders (default true)")] bool recursive = true) {
     var activity = ToolActivity.Start<BlockTools>("Bausteine eines Ordners werden in Dateien exportiert");
     try {
@@ -331,9 +331,9 @@ public class BlockTools {
   public static async Task<CallToolResult> GetBlockFileList(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
     [Description("Names of the blocks to export")] string[] blockNames) {
     if (blockNames == null || blockNames.All(string.IsNullOrWhiteSpace)) {
       return TiaRestClient.FromValidationError("Error: blockNames must contain at least one block name.");
@@ -367,10 +367,10 @@ public class BlockTools {
   public static async Task<CallToolResult> PutBlockDir(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory of the files, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<path>")] string rootDirectory,
-    [Description("Optional folder as names from the root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; selects the start directory and the matching project folder; omit for the root")] string[]? path = null,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Optional TIA folder path (not filesystem): folder names from the PLC root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; selects start filesystem directory under rootDirectory and matching TIA project folder; omit for root")] string[]? path = null,
     [Description("Include subdirectories (default true)")] bool recursive = true,
     [Description("Only needed if <Name>.s7dcl and <Name>.xml both exist: \"SimaticData/SD\" or \"SimaticML/XML\"")] string? format = null) {
     var activity = ToolActivity.Start<BlockTools>("Bausteine eines Verzeichnisses werden importiert");
@@ -404,10 +404,10 @@ public class BlockTools {
   public static async Task<CallToolResult> PutBlockFileList(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory of the files, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
-    [Description("Blocks to import: BlockName (required), Path (optional folder names; selects file subdirectory and target folder), Format (optional), BlockNumber (optional)")] PutFileListItem[] items,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Blocks to import: BlockName (required), Path (optional TIA folder names, not filesystem; selects subdirectory under rootDirectory and TIA target folder), Format (optional), BlockNumber (optional)")] PutFileListItem[] items,
     [Description("Only for instances of library types: \"InTest\" or \"Release\"; omit for normal blocks")] string? libraryMode = null,
     [Description("Only with libraryMode \"Release\": version number to release, e.g. \"0.1.37\"")] string? libraryVersion = null,
     [Description("Only with libraryMode \"Release\": author of the released versions")] string? libraryAuthor = null,
@@ -448,8 +448,8 @@ public class BlockTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the block (instance of the library type)")] string blockName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName) {
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName) {
     var activity = ToolActivity.Start<BlockTools>($"In-Test-Version von {blockName} wird verworfen");
     try {
       string safeProjectName = Uri.EscapeDataString(projectName);
@@ -478,8 +478,8 @@ public class BlockTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the data block")] string blockName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
     [Description("New start values: list of objects with Member (variable path) and Value (start value)")] StartValueUpdate[] startValues) {
     var activity = ToolActivity.Start<BlockTools>($"Startwerte in {blockName} werden angepasst");
     try {

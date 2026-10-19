@@ -103,7 +103,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
   /// Request-Body für das Anlegen oder Überschreiben einer Variablentabelle aus einer XML-Datei (PUT).
   /// </summary>
   public class PutFileRequest {
-    public string RootDirectory { get; set; }  // absoluter Pfad des Wurzelverzeichnisses
+    public string RootDirectory { get; set; }  // absoluter Dateisystem-Pfad (TIA/REST-Rechner) als Basis für Export/Import; Dateien unter Root\Projekt\Ordnerpfad
     public string[] Path { get; set; }         // Dateiordner und Zielordner für neue Tabellen; null = bisheriger Ordner bzw. Wurzelordner
   }
 

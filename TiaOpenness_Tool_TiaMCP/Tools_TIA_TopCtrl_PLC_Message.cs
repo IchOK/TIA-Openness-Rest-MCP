@@ -59,7 +59,7 @@ public class MessageTools {
   public static async Task<CallToolResult> GetMessagesFile(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"; the file goes to <rootDirectory>\\<project name>")] string rootDirectory,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; CSV is written under <rootDirectory>\\<project name>\\")] string rootDirectory,
     [Description("Optional file name without path (default Messages.csv; .csv is appended if missing)")] string? fileName = null,
     [Description("Optional column separator: \";\" (default, Excel with German locale), \",\" or \"tab\"")] string? separator = null,
     [Description("Optional device / station name to limit the scan")] string? deviceName = null,

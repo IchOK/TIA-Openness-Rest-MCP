@@ -26,7 +26,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="path">Optionaler Ordnerfilter, ein Parameter je Ordnername (path=A&amp;path=B); liefert die Tagtabellen dieses Ordners inkl. Unterordnern</query>
+    /// <query name="path">Ordnerpfad in der TIA-Tagtabellen-Struktur (nicht Dateisystem): ein Parameter je Ordnername vom Wurzelordner (path=A&amp;path=B); inkl. Unterordner</query>
     /// <returns>JSON-String mit der Liste der Tagtabellen je PLC oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.List)]
     static public string List(HttpListenerContext context) {
@@ -35,7 +35,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       string[] filterPath = ReadPathFilter(context);
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           var list = new List<PlcList>();
           foreach (Device device in project.Devices) {
             foreach (DeviceItem deviceItem in device.DeviceItems) {
@@ -84,8 +84,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="tagTableName">Name der Tagtabelle</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <returns>JSON-String mit der Tagtabelle oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.Get)]
     static public string Get(HttpListenerContext context) {
@@ -96,7 +96,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       string deviceItemName = context.Request.QueryString["deviceItemName"];
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           var errorMessage = cTiaProject.GetPlcTagTableGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup);
           if (errorMessage != null) {
             Console.Error.WriteLine(errorMessage);
@@ -173,8 +173,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="tagTableName">Name der Tagtabelle</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PutRequest mit Tags, UserConstants und optional Path</body>
     /// <returns>JSON-String mit PutResult oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.Put, "PUT")]
@@ -207,7 +207,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       }
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           var errorMessage = cTiaProject.GetPlcTagTableGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup);
           if (errorMessage != null) {
             return ErrorResponse(context, HttpStatusCode.NotFound, errorMessage);
@@ -295,8 +295,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="tagTableName">Name der Tagtabelle</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PatchRequest mit den zu ändernden Tags und UserConstants</body>
     /// <returns>JSON-String mit PatchResult oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.Patch, "PATCH")]
@@ -328,7 +328,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       }
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           var errorMessage = cTiaProject.GetPlcTagTableGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup);
           if (errorMessage != null) {
             return ErrorResponse(context, HttpStatusCode.NotFound, errorMessage);
@@ -406,9 +406,9 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="tagTableName">Name der Tagtabelle</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
-    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
+    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
     /// <returns>JSON-String mit FileData oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.GetFile)]
     static public string GetFile(HttpListenerContext context) {
@@ -437,10 +437,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
-    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
-    /// <query name="path">Tagtabellen-Ordner, ein Parameter je Ordnername; ohne Angabe der Wurzelordner</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
+    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
+    /// <query name="path">Start-Ordner in der TIA-Tagtabellen-Struktur (nicht Dateisystem): ein Parameter je Ordnername; ohne Angabe der Tagtabellen-Wurzel; Dateien unter &lt;rootDirectory&gt;\&lt;Projekt&gt;\&lt;dieser Ordner&gt;</query>
     /// <query name="recursive">Unterordner einbeziehen (Standard: true)</query>
     /// <returns>JSON-String mit FileBatchResult von FileData oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.GetDir)]
@@ -489,9 +489,9 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="tagTableName">Namen der Tagtabellen, ein Parameter je Tabelle (tagTableName=A&amp;tagTableName=B)</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
-    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
+    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
     /// <returns>JSON-String mit FileBatchResult von FileData oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.GetFileList)]
     static public string GetFileList(HttpListenerContext context) {
@@ -530,8 +530,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="tagTableName">Name der Tagtabelle</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PutFileRequest mit RootDirectory und optional Path</body>
     /// <returns>JSON-String mit PutFileResult oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.PutFile, "PUT")]
@@ -579,8 +579,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PutDirRequest mit RootDirectory, optional Path und Recursive</body>
     /// <returns>JSON-String mit FileBatchResult von PutFileResult oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.PutDir, "PUT")]
@@ -618,8 +618,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PutFileListRequest mit RootDirectory und Items</body>
     /// <returns>JSON-String mit FileBatchResult von PutFileResult oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.PutFileList, "PUT")]
@@ -667,7 +667,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <summary>
     /// Exportiert eine Tagtabelle (gesucht über den Namen) als XML-Datei unter Root\Projekt\Ordnerpfad der Tabelle.
     /// </summary>
-    static private ItemResult<FileData> ExportTagTableFile(Project project, PlcSoftware plcSoftware, PlcTagTableGroup plcTagTableGroup, string deviceName, string deviceItemName, string tagTableName, string fullRoot) {
+    static private ItemResult<FileData> ExportTagTableFile(ProjectBase project, PlcSoftware plcSoftware, PlcTagTableGroup plcTagTableGroup, string deviceName, string deviceItemName, string tagTableName, string fullRoot) {
       PlcTagTable table = cTiaFindHelpers.FindTagTable(plcTagTableGroup, tagTableName);
       if (table == null) {
         return ItemResult<FileData>.Fail(HttpStatusCode.NotFound, $"Error: Tag table with name {tagTableName} not found in PLC software {plcSoftware.Name}.");
@@ -678,7 +678,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <summary>
     /// Exportiert eine Tagtabelle als XML-Datei &lt;Name&gt;.xml unter Root\Projekt\Ordnerpfad der Tabelle; eine vorhandene Datei wird ersetzt.
     /// </summary>
-    static private ItemResult<FileData> ExportTagTableFile(Project project, PlcSoftware plcSoftware, PlcTagTable table, string deviceName, string deviceItemName, string fullRoot) {
+    static private ItemResult<FileData> ExportTagTableFile(ProjectBase project, PlcSoftware plcSoftware, PlcTagTable table, string deviceName, string deviceItemName, string fullRoot) {
       string[] tablePath = GetTagTablePath(table);
       string errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, project.Name, tablePath, out string directory);
       if (errorMessage != null) {
@@ -717,7 +717,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Eine bestehende Tabelle wird in ihrem Ordner überschrieben; eine neue wird im Ordner Path angelegt.
     /// </summary>
     /// <param name="requestPath">Dateiordner und Zielordner für neue Tabellen; null = bisheriger Ordner bzw. Wurzelordner</param>
-    static private ItemResult<PutFileResult> ImportTagTableFile(Project project, PlcSoftware plcSoftware, PlcTagTableGroup plcTagTableGroup, string deviceName, string deviceItemName,
+    static private ItemResult<PutFileResult> ImportTagTableFile(ProjectBase project, PlcSoftware plcSoftware, PlcTagTableGroup plcTagTableGroup, string deviceName, string deviceItemName,
       string tagTableName, string[] requestPath, string fullRoot) {
       PlcTagTable existing = cTiaFindHelpers.FindTagTable(plcTagTableGroup, tagTableName);
       string[] existingPath = existing != null ? GetTagTablePath(existing) : null;

@@ -10,6 +10,8 @@ namespace Tophinke.TiaOpenness.Tool.Consts
     public const string TiaRestApiKeyHeader = "X-API-Key";
     public const string RouteHealth = "/api/health";
     public const string RouteHelp = "/help";
+    /// <summary>Web-Oberfläche zum Auslösen von REST-Anfragen (statische Dateien unter / und /ui/…).</summary>
+    public const string RouteUi = "/";
   }
 
   // Routen-Schema: /api/<bereich>/<funktion>; der MCP-Toolname ist derselbe Pfad mit "tia" statt "/api"
@@ -24,6 +26,11 @@ namespace Tophinke.TiaOpenness.Tool.Consts
     public const string Open = "/api/projects/open";
     public const string Save = "/api/projects/save";
     public const string Close = "/api/projects/close";
+
+    /// <summary>Einzelprojekt (.ap…).</summary>
+    public const string KindProject = "Project";
+    /// <summary>Lokale Session eines Project-Server-Projekts (.amc…).</summary>
+    public const string KindLocalSession = "LocalSession";
     public const string GraphicsList = "/api/project/graphics/list";
     public const string GraphicsCleanupDuplicates = "/api/project/graphics/cleanup-duplicates";
   }

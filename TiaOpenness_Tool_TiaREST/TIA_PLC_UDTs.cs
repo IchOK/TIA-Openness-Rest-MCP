@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Siemens.Engineering;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
@@ -34,7 +34,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="path">Optionaler Ordnerfilter, ein Parameter je Ordnername (path=A&amp;path=B); liefert die Datentypen dieses Ordners inkl. Unterordnern</query>
+    /// <query name="path">Ordnerpfad in der TIA-UDT-Struktur (nicht Dateisystem): ein Parameter je Ordnername vom Wurzelordner (path=A&amp;path=B); inkl. Unterordner</query>
     /// <returns>JSON-String mit der Liste der Datentypen je PLC oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.List)]
     static public string List(HttpListenerContext context) {
@@ -44,7 +44,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
 
       try {
         // TIA-Zugriff via Connection Manager, der Attach-Lifetime handhabt
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           var list = new List<PlcList>();
           // Suche in allen Geräten nach einer PLC (Steuerung)
           foreach (Device device in project.Devices) {
@@ -95,8 +95,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="udtName">Name des Datentyps</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Gerätelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <returns>JSON-String mit dem Datentyp als SD-Dokument oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.Get)]
     static public string Get(HttpListenerContext context) {
@@ -145,8 +145,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="udtName">Name des Datentyps</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PutRequest mit Content (SD oder XML), optional Format, MultiLingualText, Path und Bibliotheksoptionen</body>
     /// <returns>JSON-String mit PutResult oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.Put, "PUT")]
@@ -204,9 +204,9 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="udtName">Name des Datentyps</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
-    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
+    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
     /// <returns>JSON-String mit FileData oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.GetFile)]
     static public string GetFile(HttpListenerContext context) {
@@ -236,10 +236,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
-    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
-    /// <query name="path">Datentyp-Ordner, ein Parameter je Ordnername; ohne Angabe der Wurzelordner</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
+    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
+    /// <query name="path">Start-Ordner in der TIA-UDT-Struktur (nicht Dateisystem): ein Parameter je Ordnername; ohne Angabe der UDT-Wurzel; Dateien unter &lt;rootDirectory&gt;\&lt;Projekt&gt;\&lt;dieser Ordner&gt;</query>
     /// <query name="recursive">Unterordner einbeziehen (Standard: true)</query>
     /// <returns>JSON-String mit FileBatchResult von FileData oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.GetDir)]
@@ -292,9 +292,9 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="udtName">Namen der Datentypen, ein Parameter je Datentyp (udtName=A&amp;udtName=B)</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
-    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
+    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
     /// <returns>JSON-String mit FileBatchResult von FileData oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.GetFileList)]
     static public string GetFileList(HttpListenerContext context) {
@@ -333,8 +333,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="udtName">Name des Datentyps</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PutFileRequest mit RootDirectory, optional Format, Path und Bibliotheksoptionen</body>
     /// <returns>JSON-String mit PutFileResult oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.PutFile, "PUT")]
@@ -390,8 +390,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PutDirRequest mit RootDirectory, optional Path, Recursive und Format</body>
     /// <returns>JSON-String mit FileBatchResult von PutFileResult oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.PutDir, "PUT")]
@@ -431,8 +431,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <body>PutFileListRequest mit RootDirectory, Items und optional den Bibliotheksoptionen</body>
     /// <returns>JSON-String mit FileBatchResult von PutFileResult oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.PutFileList, "PUT")]
@@ -499,8 +499,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="udtName">Name des Datentyps (Instanz des Bibliothekstyps)</query>
-    /// <query name="deviceName">Name des Geräts</query>
-    /// <query name="deviceItemName">Name des Geräteelements</query>
+    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
+    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
     /// <returns>JSON-String mit DiscardTypeVersionResult oder Fehlermeldung</returns>
     [RestRoute(UDTRoutes.DiscardTypeVersion, "POST")]
     static public string DiscardTypeVersion(HttpListenerContext context) {
@@ -555,7 +555,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// Führt den Import eines Datentyps als Einzelaufruf aus und setzt die Antwort.
     /// </summary>
     static private string ImportUdt(HttpListenerContext context, string processIdStr, string projectName, string deviceName, string deviceItemName,
-      string typeName, string[] requestPath, LibraryWriteOptions library, Func<Project, string[], ItemResult<ImportSource>> loadSource) {
+      string typeName, string[] requestPath, LibraryWriteOptions library, Func<ProjectBase, string[], ItemResult<ImportSource>> loadSource) {
       return cTiaFileBatchHelpers.ExecuteItem(context, processIdStr, projectName, project => {
         var errorMessage = cTiaProject.GetPlcSystemTypeGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcTypeGroup plcTypeGroup);
         if (errorMessage != null) {
@@ -573,8 +573,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="requestPath">Zielordner für neue Datentypen; null = Wurzelordner bzw. bisheriger Ordner</param>
     /// <param name="loadSource">Liefert Format und Inhalt zum Dateiordner (Path aus dem Request, sonst bisheriger Ordner bzw. Wurzelordner)</param>
     /// <returns>PutResult bzw. PutFileResult oder Fehler</returns>
-    static private ItemResult<PutResult> ImportUdt(Project project, PlcSoftware plcSoftware, PlcTypeGroup plcTypeGroup, string deviceName, string deviceItemName,
-      string typeName, string[] requestPath, LibraryWriteOptions library, Func<Project, string[], ItemResult<ImportSource>> loadSource) {
+    static private ItemResult<PutResult> ImportUdt(ProjectBase project, PlcSoftware plcSoftware, PlcTypeGroup plcTypeGroup, string deviceName, string deviceItemName,
+      string typeName, string[] requestPath, LibraryWriteOptions library, Func<ProjectBase, string[], ItemResult<ImportSource>> loadSource) {
       PlcType existing = cTiaFindHelpers.FindType(plcTypeGroup, typeName);
       if (existing != null && existing.IsKnowHowProtected) {
         return ItemResult<PutResult>.Fail(HttpStatusCode.Conflict, $"Error: Type {typeName} is know-how-protected and cannot be overwritten.");
@@ -672,7 +672,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <summary>
     /// Exportiert einen Datentyp (gesucht über den Namen) in Dateien unter Root\Projekt\Ordnerpfad des Datentyps.
     /// </summary>
-    static private ItemResult<FileData> ExportUdtFiles(Project project, PlcSoftware plcSoftware, PlcTypeGroup plcTypeGroup, string deviceName, string deviceItemName, string typeName, string fullRoot) {
+    static private ItemResult<FileData> ExportUdtFiles(ProjectBase project, PlcSoftware plcSoftware, PlcTypeGroup plcTypeGroup, string deviceName, string deviceItemName, string typeName, string fullRoot) {
       PlcType type = cTiaFindHelpers.FindType(plcTypeGroup, typeName);
       if (type == null) {
         return ItemResult<FileData>.Fail(HttpStatusCode.NotFound, $"Error: Type with name {typeName} not found in PLC software {plcSoftware.Name}.");
@@ -683,7 +683,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <summary>
     /// Exportiert einen Datentyp als SD-Dokument (.s7dcl, optional .s7res) unter Root\Projekt\Ordnerpfad des Datentyps.
     /// </summary>
-    static private ItemResult<FileData> ExportUdtFiles(Project project, PlcSoftware plcSoftware, PlcType type, string deviceName, string deviceItemName, string fullRoot) {
+    static private ItemResult<FileData> ExportUdtFiles(ProjectBase project, PlcSoftware plcSoftware, PlcType type, string deviceName, string deviceItemName, string fullRoot) {
       if (type.IsKnowHowProtected) {
         return ItemResult<FileData>.Fail(HttpStatusCode.Conflict, $"Error: Type {type.Name} is know-how-protected and cannot be exported.");
       }

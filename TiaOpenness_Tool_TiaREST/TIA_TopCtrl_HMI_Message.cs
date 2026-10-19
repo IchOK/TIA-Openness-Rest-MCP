@@ -51,8 +51,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename des Unified-Geräts (optional, wenn nur eines vorhanden ist)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional, wenn nur eines vorhanden ist</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>SyncRequest</body>
     /// <returns>JSON-String mit SyncResult oder Fehlermeldung</returns>
     [RestRoute(MessageRoutes.HmiSync, "POST")]

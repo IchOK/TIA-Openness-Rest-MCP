@@ -25,8 +25,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional, wenn nur ein Unified-Gerät vorhanden ist)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional, wenn nur eines vorhanden ist</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <query name="tagTableName">Nur Variablen dieser Tabelle (optional)</query>
     /// <query name="namePattern">Namensfilter mit * und ? (optional)</query>
     /// <returns>JSON-String mit ListResult von TagInfo oder Fehlermeldung</returns>
@@ -51,8 +51,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>TagPutRequest</body>
     /// <returns>JSON-String mit ChangeResult oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.TagsPut, "PUT")]
@@ -80,8 +80,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>DeleteRequest</body>
     /// <returns>JSON-String mit ChangeResult oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.TagsDelete, "POST")]
@@ -106,10 +106,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
+    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Export-Basis; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;HmiName&gt;\Tags\&lt;Tabelle&gt;</query>
     /// <query name="tagTableName">Nur diese Tabelle (optional, Standard: alle Tabellen)</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <returns>JSON-String mit TagFileData oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.TagsGetFile)]
     static public string GetFile(HttpListenerContext context) {
@@ -146,8 +146,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="tagTableName">Nur diese Tabelle (optional, Standard: alle Unterordner)</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>TagPutFileRequest</body>
     /// <returns>JSON-String mit TagFileData oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.TagsPutFile, "PUT")]
@@ -366,7 +366,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
 
     #region Dateien
 
-    static string TagDirectory(string rootDirectory, Project project, UnifiedTarget target) {
+    static string TagDirectory(string rootDirectory, ProjectBase project, UnifiedTarget target) {
       return Path.Combine(rootDirectory, project.Name, SafeFileName(target.Software.Name), "Tags");
     }
 

@@ -9,13 +9,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaMCP;
 [McpServerToolType]
 public class ProjectTools {
   [McpServerTool(Name = "tia_projects_list"), Description(
-    "Returns a list of all currently open TIA Portal projects and their Process IDs. " +
+    "Returns a list of all currently open TIA Portal projects and Project Server local sessions and their Process IDs. " +
     "Call this first to obtain processId and projectName for other tools. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON array of objects with: " +
     "ProcessId (TIA Portal process ID; pass as processId to other tools), " +
-    "Name (project name; pass as projectName to other tools), " +
-    "Path (full file system path of the project).")]
+    "Name (project / session project name; pass as projectName to other tools), " +
+    "Path (full file system path: .ap… for standalone projects, .amc… for Project Server local sessions), " +
+    "Kind (\"Project\" or \"LocalSession\").")]
   public static async Task<CallToolResult> ListProjects() {
     var activity = ToolActivity.Start<ProjectTools>("TIA Portal Projekte werden abgerufen");
     try {
@@ -39,10 +40,10 @@ public class ProjectTools {
     "On success, Data is a JSON object with: ProcessId and Name (pass as processId/projectName to other tools), Path (project file), " +
     "Mode (\"Open\", \"OpenWithUpgrade\", \"Retrieve\", \"RetrieveWithUpgrade\" or \"AlreadyOpen\"), StartedTiaPortal (true if TIA Portal was started).")]
   public static async Task<CallToolResult> OpenProject(
-    [Description("Absolute path of the project file (.ap<version>) or project archive (.zap<version>)")] string path,
+    [Description("Absolute filesystem path on the TIA machine to the project file (.ap<version>) or project archive (.zap<version>); not a TIA-internal path")] string path,
     [Description("Optional ProcessId of a TIA Portal instance without open project; omit to use an idle instance or start TIA Portal")] int? processId = null,
     [Description("Optional: true opens/retrieves a project of an older TIA Portal version with upgrade")] bool upgrade = false,
-    [Description("Archives only: absolute directory the archive is retrieved to")] string? targetDirectory = null,
+    [Description("Archives only: absolute filesystem directory on the TIA machine into which the project archive is retrieved (not a TIA-internal path)")] string? targetDirectory = null,
     [Description("Optional maximum time in seconds to wait for a newly started TIA Portal (default 300)")] int? startTimeoutSeconds = null) {
     var activity = ToolActivity.Start<ProjectTools>($"Projekt {Path.GetFileName(path)} wird geöffnet");
     try {
@@ -69,15 +70,17 @@ public class ProjectTools {
   }
 
   [McpServerTool(Name = "tia_projects_save"), Description(
-    "Saves an open TIA Portal project. " +
+    "Saves an open TIA Portal project or Project Server local session. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
-    "On success, Data is a JSON object with: ProcessId, Name, Path, WasModified (true if the project had unsaved changes).")]
+    "On success, Data is a JSON object with: ProcessId, Name, Path, Kind, WasModified (true if the project had unsaved changes).")]
   public static async Task<CallToolResult> SaveProject(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
-    [Description("The name of the project")] string projectName) {
+    [Description("The name of the project")] string projectName,
+    [Description("Optional: Project or LocalSession when names collide")] string? kind = null) {
     var activity = ToolActivity.Start<ProjectTools>($"Projekt {projectName} wird gespeichert");
     try {
-      string route = $"{ProjectRoutes.Save}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}";
+      string route = $"{ProjectRoutes.Save}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}"
+        + TiaRestClient.KindQuery(kind);
 
       using var httpContent = new StringContent("", Encoding.UTF8, "application/json");
       using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PostAsync(route, httpContent);
@@ -88,19 +91,21 @@ public class ProjectTools {
   }
 
   [McpServerTool(Name = "tia_projects_close"), Description(
-    "Closes an open TIA Portal project; TIA Portal itself keeps running. " +
+    "Closes an open TIA Portal project or Project Server local session; TIA Portal itself keeps running. " +
     "If the project has unsaved changes, pass save=true to save them first or discardChanges=true to discard them; " +
     "otherwise the call fails with status 409 and the project stays open. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
-    "On success, Data is a JSON object with: ProcessId, Name, Path, Saved (true if saved before closing), DiscardedChanges (true if unsaved changes were discarded).")]
+    "On success, Data is a JSON object with: ProcessId, Name, Path, Kind, Saved (true if saved before closing), DiscardedChanges (true if unsaved changes were discarded).")]
   public static async Task<CallToolResult> CloseProject(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("Optional: true saves the project before closing")] bool save = false,
-    [Description("Optional: true closes the project even if it has unsaved changes, discarding them")] bool discardChanges = false) {
+    [Description("Optional: true closes the project even if it has unsaved changes, discarding them")] bool discardChanges = false,
+    [Description("Optional: Project or LocalSession when names collide")] string? kind = null) {
     var activity = ToolActivity.Start<ProjectTools>($"Projekt {projectName} wird geschlossen");
     try {
-      string route = $"{ProjectRoutes.Close}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}";
+      string route = $"{ProjectRoutes.Close}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}"
+        + TiaRestClient.KindQuery(kind);
       if (save) {
         route += "&save=true";
       }

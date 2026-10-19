@@ -34,8 +34,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Optional: Name des Geräts; ohne Angabe alle PLCs</query>
-    /// <query name="deviceItemName">Optional: Name des Geräteelements; ohne Angabe alle PLCs</query>
+    /// <query name="deviceName">Optional: Name der PLC-Station (DeviceName aus /api/plc/devices/list); ohne Angabe alle PLCs</query>
+    /// <query name="deviceItemName">Optional: Name der CPU (DeviceItemName aus /api/plc/devices/list); ohne Angabe alle PLCs</query>
     /// <query name="includeUnselected">Optional: true liefert auch Meldungen mit stConfig.xSelect = FALSE</query>
     /// <returns>JSON-String mit ListResult (Messages, Warnings) oder Fehlermeldung</returns>
     [RestRoute(MessageRoutes.List)]
@@ -47,7 +47,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
       bool includeUnselected = string.Equals(context.Request.QueryString["includeUnselected"], "true", StringComparison.OrdinalIgnoreCase);
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           ListResult result = Collect(project, deviceName, deviceItemName, includeUnselected);
           if (result == null) {
             return NoPlcResponse(context, deviceName, deviceItemName);
@@ -76,11 +76,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</query>
+    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Export-Basis; CSV unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\</query>
     /// <query name="fileName">Optional: Dateiname ohne Pfad; Standard Messages.csv, .csv wird ergänzt</query>
     /// <query name="separator">Optional: Trennzeichen ";" (Standard), "," oder "tab"</query>
-    /// <query name="deviceName">Optional: Name des Geräts; ohne Angabe alle PLCs</query>
-    /// <query name="deviceItemName">Optional: Name des Geräteelements; ohne Angabe alle PLCs</query>
+    /// <query name="deviceName">Optional: Name der PLC-Station (DeviceName aus /api/plc/devices/list); ohne Angabe alle PLCs</query>
+    /// <query name="deviceItemName">Optional: Name der CPU (DeviceItemName aus /api/plc/devices/list); ohne Angabe alle PLCs</query>
     /// <query name="includeUnselected">Optional: true exportiert auch Meldungen mit stConfig.xSelect = FALSE</query>
     /// <returns>JSON-String mit FileData oder Fehlermeldung</returns>
     [RestRoute(MessageRoutes.GetFile)]
@@ -105,7 +105,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
       }
 
       try {
-        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var retValue = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           ListResult result = Collect(project, deviceName, deviceItemName, includeUnselected);
           if (result == null) {
             return NoPlcResponse(context, deviceName, deviceItemName);
@@ -141,7 +141,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.TopCtrl.PLC {
     /// <summary>
     /// Sammelt die Meldungen aller passenden PLCs; null, wenn keine PLC gefunden wurde.
     /// </summary>
-    static internal ListResult Collect(Project project, string deviceName, string deviceItemName, bool includeUnselected) {
+    static internal ListResult Collect(ProjectBase project, string deviceName, string deviceItemName, bool includeUnselected) {
       var result = new ListResult();
       int plcCount = 0;
       foreach (Device device in project.Devices) {

@@ -191,7 +191,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.HMI {
   /// Request-Body für den Import von HMI-Variablen aus Dateien (PUT).
   /// </summary>
   public class TagPutFileRequest {
-    public string RootDirectory { get; set; }    // absoluter Pfad des Wurzelverzeichnisses
+    public string RootDirectory { get; set; }    // absoluter Dateisystem-Pfad (TIA/REST-Rechner) als Import-Basis; Dateien unter Root\Projekt\HmiName\Tags\Tabelle
   }
 
   /// <summary>

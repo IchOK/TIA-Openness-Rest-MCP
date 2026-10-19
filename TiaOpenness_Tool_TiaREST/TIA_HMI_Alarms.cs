@@ -25,8 +25,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional, wenn nur ein Unified-Gerät vorhanden ist)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional, wenn nur eines vorhanden ist</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <query name="kind">"Discrete" oder "Analog" (optional, Standard: beide)</query>
     /// <query name="namePattern">Namensfilter mit * und ? (optional)</query>
     /// <returns>JSON-String mit ListResult von AlarmInfo oder Fehlermeldung</returns>
@@ -56,8 +56,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>AlarmPutRequest</body>
     /// <returns>JSON-String mit ChangeResult oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.AlarmsPut, "PUT")]
@@ -82,8 +82,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>DeleteRequest</body>
     /// <returns>JSON-String mit ChangeResult oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.AlarmsDelete, "POST")]
@@ -110,8 +110,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <returns>JSON-String mit ListResult von AlarmClassInfo oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.AlarmClassesList)]
     static public string ClassesList(HttpListenerContext context) {
@@ -127,8 +127,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>AlarmClassPutRequest</body>
     /// <returns>JSON-String mit ChangeResult oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.AlarmClassesPut, "PUT")]
@@ -152,8 +152,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>DeleteRequest</body>
     /// <returns>JSON-String mit ChangeResult oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.AlarmClassesDelete, "POST")]
@@ -233,7 +233,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
 
     #region Schreiben
 
-    static internal Change Upsert(Project project, HmiSoftware hmi, AlarmInfo info, Language language) {
+    static internal Change Upsert(ProjectBase project, HmiSoftware hmi, AlarmInfo info, Language language) {
       HmiDiscreteAlarm discrete = hmi.DiscreteAlarms.Find(info.Name);
       HmiAnalogAlarm analog = discrete == null ? hmi.AnalogAlarms.Find(info.Name) : null;
       string kind = discrete != null ? Discrete : analog != null ? Analog : string.IsNullOrEmpty(info.Kind) ? Discrete : info.Kind;

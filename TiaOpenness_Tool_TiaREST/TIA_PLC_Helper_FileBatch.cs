@@ -62,7 +62,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
     /// <summary>
     /// Führt einen Einzelaufruf im TIA-Projekt aus und setzt die Antwort.
     /// </summary>
-    static public string ExecuteItem<T>(HttpListenerContext context, string processIdStr, string projectName, Func<Project, ItemResult<T>> action) {
+    static public string ExecuteItem<T>(HttpListenerContext context, string processIdStr, string projectName, Func<ProjectBase, ItemResult<T>> action) {
       return Execute(context, processIdStr, projectName, action, value => {
         context.Response.ContentType = "application/json";
         return JsonConvert.SerializeObject(value);
@@ -73,7 +73,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
     /// Führt eine Batch-Operation im TIA-Projekt aus und setzt die Antwort.
     /// Sind einzelne Elemente fehlgeschlagen, ist der Status 400 und der Body enthält trotzdem das vollständige Ergebnis.
     /// </summary>
-    static public string ExecuteBatch<T>(HttpListenerContext context, string processIdStr, string projectName, Func<Project, ItemResult<FileBatchResult<T>>> action) {
+    static public string ExecuteBatch<T>(HttpListenerContext context, string processIdStr, string projectName, Func<ProjectBase, ItemResult<FileBatchResult<T>>> action) {
       return Execute(context, processIdStr, projectName, action, batch => {
         batch.Succeeded = batch.Items.Count;
         batch.Failed = batch.Errors.Count;
@@ -85,9 +85,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
       });
     }
 
-    static private string Execute<T>(HttpListenerContext context, string processIdStr, string projectName, Func<Project, ItemResult<T>> action, Func<T, string> serialize) {
+    static private string Execute<T>(HttpListenerContext context, string processIdStr, string projectName, Func<ProjectBase, ItemResult<T>> action, Func<T, string> serialize) {
       try {
-        ItemResult<T> result = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, action);
+        string kind = context.Request.QueryString["kind"];
+        ItemResult<T> result = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, action, kind);
         return result.Failed ? ErrorResponse(context, result.Status, result.Error) : serialize(result.Value);
       } catch (EngineeringObjectDisposedException ex) {
         Console.Error.WriteLine($"TIA session disposed: {ex.Message}");

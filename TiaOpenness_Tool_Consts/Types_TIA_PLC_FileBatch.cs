@@ -6,7 +6,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch {
   /// Die Dateien werden aus Root\Projekt\Ordnerpfad gelesen; Unterverzeichnisse entsprechen Unterordnern im Projekt.
   /// </summary>
   public class PutDirRequest {
-    public string RootDirectory { get; set; }  // absoluter Pfad des Wurzelverzeichnisses
+    public string RootDirectory { get; set; }  // absoluter Dateisystem-Pfad (TIA/REST-Rechner) als Basis für Export/Import; Dateien unter Root\Projekt\Ordnerpfad
     public string[] Path { get; set; }         // Ordnerpfad; null/leer = Wurzelordner
     public bool? Recursive { get; set; }       // Unterverzeichnisse einbeziehen; null = true
     public string Format { get; set; }         // bei .s7dcl und .xml mit gleichem Namen: zu verwendendes Format; leer = Fehler für dieses Element

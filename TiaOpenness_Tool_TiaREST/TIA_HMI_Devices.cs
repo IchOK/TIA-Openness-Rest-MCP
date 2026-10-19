@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using Siemens.Engineering;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
@@ -221,7 +221,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <summary>
     /// Setzt einen mehrsprachigen Text je Sprache (Schlüssel z. B. "de-DE").
     /// </summary>
-    static internal void SetTexts(Project project, MultilingualText text, Dictionary<string, string> values) {
+    static internal void SetTexts(ProjectBase project, MultilingualText text, Dictionary<string, string> values) {
       foreach (var entry in values) {
         Language language = project.LanguageSettings.ActiveLanguages
           .FirstOrDefault(l => string.Equals(l.Culture.Name, entry.Key, StringComparison.OrdinalIgnoreCase));
@@ -248,9 +248,10 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <summary>
     /// Führt eine Aktion im Projekt aus und setzt bei Fehlern Statuscode und Fehlertext wie die übrigen Handler.
     /// </summary>
-    static internal string Execute(HttpListenerContext context, string processIdStr, string projectName, Func<Project, string> action) {
+    static internal string Execute(HttpListenerContext context, string processIdStr, string projectName, Func<ProjectBase, string> action) {
       try {
-        return TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, action);
+        string kind = context.Request.QueryString["kind"];
+        return TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, action, kind);
       } catch (TiaProjectNotFoundException ex) {
         return ErrorResponse(context, HttpStatusCode.NotFound, $"Error: {ex.Message}");
       } catch (EngineeringObjectDisposedException ex) {
@@ -264,7 +265,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <summary>
     /// Führt eine Aktion mit der Unified-Software aus, die über die Query-Parameter deviceName/deviceItemName gewählt ist.
     /// </summary>
-    static internal string ExecuteOnHmi(HttpListenerContext context, Func<Project, UnifiedTarget, string> action) {
+    static internal string ExecuteOnHmi(HttpListenerContext context, Func<ProjectBase, UnifiedTarget, string> action) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       string deviceName = context.Request.QueryString["deviceName"];
@@ -362,7 +363,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <summary>
     /// Alle Geräte mit WinCC Unified-Software, auch in Geräteordnern und als Unterelement (z. B. PC-Station).
     /// </summary>
-    static internal List<UnifiedTarget> FindAll(Project project) {
+    static internal List<UnifiedTarget> FindAll(ProjectBase project) {
       var targets = new List<UnifiedTarget>();
       foreach (Device device in AllDevices(project)) {
         foreach (DeviceItem item in device.DeviceItems) {
@@ -376,7 +377,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// Sucht die WinCC Unified-Software eines Geräts. Ohne deviceName/deviceItemName wird das einzige Unified-Gerät verwendet.
     /// </summary>
     /// <returns>Fehlermeldung oder null bei Erfolg</returns>
-    static internal string Find(Project project, string deviceName, string deviceItemName, out UnifiedTarget target) {
+    static internal string Find(ProjectBase project, string deviceName, string deviceItemName, out UnifiedTarget target) {
       target = null;
       List<UnifiedTarget> all = FindAll(project);
       if (all.Count == 0) {
@@ -411,7 +412,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
       }
     }
 
-    static IEnumerable<Device> AllDevices(Project project) {
+    static IEnumerable<Device> AllDevices(ProjectBase project) {
       foreach (Device device in project.Devices) {
         yield return device;
       }

@@ -22,8 +22,8 @@ public class XRefTools {
   public static async Task<CallToolResult> GetCrossReferences(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
     [Description("The name of the object to look up (block, tag, UDT, or system constant name)")] string objectName,
     [Description("The kind of object. Allowed values: Block (FC/FB/OB/DB), Tag (PLC tag), Udt (user-defined type), SystemConstant")] string objectKind,
     [Description("Optional CrossReferenceFilter. Allowed values: AllObjects (default), ObjectsWithReferences, ObjectsWithoutReferences, UnusedObjects")] string filter = "AllObjects") {

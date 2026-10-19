@@ -88,7 +88,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
         Service = "TIA Openness REST API",
         TiaVersion = RestSettings.Current.TiaVersion,
         ApiKeyHeader = Network.TiaRestApiKeyHeader,
-        Note = _docError ?? $"Endpoints with ApiKeyRequired need the header {Network.TiaRestApiKeyHeader}. " +
+        Note = _docError ?? $"Web UI: {Network.RouteUi} (or /ui/). Endpoints with ApiKeyRequired need the header {Network.TiaRestApiKeyHeader}. " +
           "Repeated query parameters (e.g. path=A&path=B) are passed once per value. Request bodies are JSON (UTF-8).",
         Endpoints = endpoints
       };
@@ -195,7 +195,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       html.Append("<p class=\"note\">").Append(Encode(help.Note)).Append("</p>");
 
       var groups = help.Endpoints.GroupBy(e => e.Group).ToList();
-      html.Append("<nav>");
+      html.Append("<nav><a href=\"/\">Web UI</a>");
       foreach (var group in groups) {
         html.Append("<a href=\"#").Append(Encode(group.Key)).Append("\">").Append(Encode(group.Key)).Append("</a>");
       }

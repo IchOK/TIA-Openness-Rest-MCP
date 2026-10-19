@@ -84,7 +84,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
     /// <summary>
     /// Prüft das vom Aufrufer übergebene Wurzelverzeichnis für den Dateiaustausch.
     /// </summary>
-    /// <param name="rootDirectory">Absoluter Pfad des Wurzelverzeichnisses</param>
+    /// <param name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import</param>
     /// <param name="fullRoot">Out-Parameter mit dem normalisierten Pfad</param>
     /// <returns>Fehlermeldung oder null bei Erfolg</returns>
     static public string ResolveRootDirectory(string rootDirectory, out string fullRoot) {

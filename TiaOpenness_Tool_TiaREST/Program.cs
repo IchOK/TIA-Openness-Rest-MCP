@@ -41,7 +41,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       listener.Prefixes.Add(url);
       listener.Start();
 
-      Console.WriteLine($"Erweiterter TIA Sidecar lauscht auf {url} ({RestRouter.Routes.Count} Routen, Beschreibung unter {Network.RouteHelp}) ...");
+      Console.WriteLine($"Erweiterter TIA Sidecar lauscht auf {url} ({RestRouter.Routes.Count} Routen, Web-UI unter /, Beschreibung unter {Network.RouteHelp}) ...");
 
       while (true) {
         HttpListenerContext context = listener.GetContext();
@@ -56,8 +56,12 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           responseString = $"Unexpected error: {ex.Message}";
         }
 
-        // Antwort senden
-        byte[] buffer = Encoding.UTF8.GetBytes(responseString ?? "");
+        // null = Antwort wurde bereits geschrieben (z. B. statische Web-UI).
+        if (responseString == null) {
+          continue;
+        }
+
+        byte[] buffer = Encoding.UTF8.GetBytes(responseString);
         response.ContentLength64 = buffer.Length;
         response.OutputStream.Write(buffer, 0, buffer.Length);
         response.OutputStream.Close();

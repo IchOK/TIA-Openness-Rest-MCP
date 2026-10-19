@@ -25,13 +25,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
+    /// <query name="kind">Optional: Project oder LocalSession zur Disambiguierung</query>
     /// <returns>JSON-String mit einer Liste von DeviceInfo oder Fehlermeldung</returns>
     [RestRoute(PlcRoutes.DevicesList)]
     static public string DevicesList(HttpListenerContext context) {
       string processIdStr = context.Request.QueryString["processId"];
       string projectName = context.Request.QueryString["projectName"];
       try {
-        var list = TiaConnectionManager.Instance.ExecuteWithProject(processIdStr, projectName, project => {
+        var list = TiaConnectionManager.Instance.ExecuteWithProject(context, processIdStr, projectName, project => {
           var result = new List<DeviceInfo>();
           foreach (PlcTarget target in FindAll(project)) {
             PlcSoftware plc = target.Software;
@@ -104,7 +105,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <summary>
     /// Alle Geräte mit PLC-Software, auch in Geräteordnern und als Unterelement (z. B. CPU im Rack).
     /// </summary>
-    static List<PlcTarget> FindAll(Project project) {
+    static List<PlcTarget> FindAll(ProjectBase project) {
       var targets = new List<PlcTarget>();
       foreach (Device device in AllDevices(project)) {
         foreach (DeviceItem item in device.DeviceItems) {
@@ -125,7 +126,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       }
     }
 
-    static IEnumerable<Device> AllDevices(Project project) {
+    static IEnumerable<Device> AllDevices(ProjectBase project) {
       foreach (Device device in project.Devices) {
         yield return device;
       }

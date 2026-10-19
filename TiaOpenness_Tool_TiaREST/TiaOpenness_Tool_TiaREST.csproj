@@ -57,6 +57,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="RestHelp.cs" />
     <Compile Include="RestRouter.cs" />
+    <Compile Include="RestStaticFiles.cs" />
     <Compile Include="RestSettings.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="OpennessWhitelist.cs" Condition=" '$(Configuration)' == 'Debug' " />
@@ -93,6 +94,18 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
     <None Include="packages.config" />
+    <Content Include="wwwroot\index.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>wwwroot\index.html</Link>
+    </Content>
+    <Content Include="wwwroot\app.css">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>wwwroot\app.css</Link>
+    </Content>
+    <Content Include="wwwroot\app.js">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>wwwroot\app.js</Link>
+    </Content>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TiaOpenness_Tool_Consts\TiaOpenness_Tool_Shared.csproj">

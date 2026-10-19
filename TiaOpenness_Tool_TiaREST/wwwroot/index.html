@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TIA Openness REST</title>
+  <link rel="stylesheet" href="/ui/app.css">
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>TIA Openness REST</h1>
+      <p class="sub">Anfragen auslösen · Kontext aus Projekt, PLC und HMI übernehmen</p>
+    </div>
+    <div class="api-key">
+      <label for="apiKey">API-Key</label>
+      <input id="apiKey" type="password" autocomplete="off" spellcheck="false" placeholder="X-API-Key">
+      <button type="button" id="btnToggleKey" class="ghost" title="API-Key anzeigen/verbergen">zeigen</button>
+      <a class="ghost link" href="/help?format=html" target="_blank" rel="noopener">API-Hilfe</a>
+    </div>
+  </header>
+
+  <section class="context card">
+    <div class="context-head">
+      <h2>Kontext</h2>
+      <button type="button" id="btnRefreshContext" class="ghost">Aktualisieren</button>
+    </div>
+    <div class="context-grid">
+      <label class="field">
+        <span>Projekt</span>
+        <select id="selProject" disabled>
+          <option value="">— Projekte laden …</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>PLC</span>
+        <select id="selPlc" disabled>
+          <option value="">— zuerst Projekt wählen —</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>HMI</span>
+        <select id="selHmi" disabled>
+          <option value="">— zuerst Projekt wählen —</option>
+        </select>
+      </label>
+    </div>
+    <p id="contextStatus" class="status muted"></p>
+  </section>
+
+  <section class="request card">
+    <h2>Anfrage</h2>
+    <div class="request-grid">
+      <label class="field grow">
+        <span>Endpunkt</span>
+        <select id="selEndpoint">
+          <option value="">— Endpunkte laden …</option>
+        </select>
+      </label>
+      <div class="method-badge" id="methodBadge">—</div>
+    </div>
+    <p id="endpointSummary" class="summary muted"></p>
+
+    <div class="params-head">
+      <h3>Query-Parameter</h3>
+      <label class="check">
+        <input type="checkbox" id="chkFillContext" checked>
+        Kontext automatisch eintragen
+      </label>
+    </div>
+    <div id="queryParams" class="params"></div>
+
+    <label class="field body-field" id="bodyField" hidden>
+      <span>Request-Body (JSON)</span>
+      <textarea id="requestBody" rows="10" spellcheck="false" placeholder="{ }"></textarea>
+      <span id="bodyHint" class="hint muted"></span>
+    </label>
+
+    <div class="actions">
+      <button type="button" id="btnSend" class="primary" disabled>Senden</button>
+      <span id="requestUrl" class="url muted"></span>
+    </div>
+  </section>
+
+  <section class="response card">
+    <div class="context-head">
+      <h2>Antwort</h2>
+      <span id="responseMeta" class="muted"></span>
+    </div>
+    <pre id="responseBody" class="code">Noch keine Anfrage gesendet.</pre>
+  </section>
+
+  <script src="/ui/app.js"></script>
+</body>
+</html>

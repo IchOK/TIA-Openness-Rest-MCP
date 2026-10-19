@@ -26,7 +26,7 @@ public class TagTableTools {
   public static async Task<CallToolResult> ListTagTables(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("Optional tag table folder as folder names from the root, e.g. [\"TopCtrl_Func\"]; includes subfolders")] string[]? path = null) {
+    [Description("Optional TIA tag table folder path (not filesystem): folder names from the PLC tag table root, e.g. [\"TopCtrl_Func\"]; includes subfolders")] string[]? path = null) {
     var activity = ToolActivity.Start<TagTableTools>("Variablentabellen werden abgerufen");
     try {
       string safeProjectName = Uri.EscapeDataString(projectName);
@@ -59,8 +59,8 @@ public class TagTableTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the tag table")] string tagTableName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName) {
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName) {
     var activity = ToolActivity.Start<TagTableTools>($"Variablentabelle {tagTableName} wird abgerufen");
     try {
       string safeProjectName = Uri.EscapeDataString(projectName);
@@ -96,11 +96,11 @@ public class TagTableTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the tag table")] string tagTableName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
     [Description("Complete list of tags: objects with Name, DataTypeName, LogicalAddress and optional Comment")] TagInfo[] tags,
     [Description("Complete list of user constants: objects with Name, DataTypeName, Value and optional Comment")] ConstantInfo[] userConstants,
-    [Description("Optional target folder for a new table as user group names from the root, e.g. [\"Plant\", \"Unit1\"]; ignored for existing tables")] string[]? path = null) {
+    [Description("Optional TIA target folder for a new table (not filesystem): user group names from the PLC tag table root, e.g. [\"Plant\", \"Unit1\"]; ignored for existing tables")] string[]? path = null) {
     var activity = ToolActivity.Start<TagTableTools>($"Variablentabelle {tagTableName} wird geschrieben");
     try {
       string safeProjectName = Uri.EscapeDataString(projectName);
@@ -134,8 +134,8 @@ public class TagTableTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the tag table")] string tagTableName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
     [Description("Tags to change: objects with Name and the fields to change (DataTypeName, LogicalAddress, Comment); omit or empty for none")] TagInfo[]? tags = null,
     [Description("User constants to change: objects with Name and the fields to change (DataTypeName, Value, Comment); omit or empty for none")] ConstantInfo[]? userConstants = null) {
     if ((tags?.Length ?? 0) + (userConstants?.Length ?? 0) == 0) {
@@ -184,9 +184,9 @@ public class TagTableTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the tag table")] string tagTableName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"; the file goes to <rootDirectory>\\<project name>\\<tag table folder path>")] string rootDirectory) {
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; the file is written under <rootDirectory>\\<project name>\\<TIA tag table folder path>")] string rootDirectory) {
     var activity = ToolActivity.Start<TagTableTools>($"Variablentabelle {tagTableName} wird in eine Datei exportiert");
     try {
       string route = $"{TagTableRoutes.GetFile}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&tagTableName={Uri.EscapeDataString(tagTableName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}";
@@ -210,10 +210,10 @@ public class TagTableTools {
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
     [Description("The name of the tag table (= file name without .xml)")] string tagTableName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory of the file, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
-    [Description("Optional folder as user group names from the root; selects the file subdirectory and the folder for a new table")] string[]? path = null) {
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; file under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Optional TIA folder path (not filesystem): user group names from the PLC tag table root; selects filesystem subdirectory under rootDirectory and TIA folder for a new table")] string[]? path = null) {
     var activity = ToolActivity.Start<TagTableTools>($"Variablentabelle {tagTableName} wird aus einer Datei importiert");
     try {
       string route = $"{TagTableRoutes.PutFile}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&tagTableName={Uri.EscapeDataString(tagTableName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
@@ -240,10 +240,10 @@ public class TagTableTools {
   public static async Task<CallToolResult> GetTagTableDir(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
-    [Description("Optional tag table folder as folder names from the root; omit for the root folder")] string[]? path = null,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Optional TIA tag table folder path (not filesystem): folder names from the PLC tag table root; omit for the root folder")] string[]? path = null,
     [Description("Include subfolders (default true)")] bool recursive = true) {
     var activity = ToolActivity.Start<TagTableTools>("Variablentabellen eines Ordners werden in Dateien exportiert");
     try {
@@ -265,9 +265,9 @@ public class TagTableTools {
   public static async Task<CallToolResult> GetTagTableFileList(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory for the export, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
     [Description("Names of the tag tables to export")] string[] tagTableNames) {
     if (tagTableNames == null || tagTableNames.All(string.IsNullOrWhiteSpace)) {
       return TiaRestClient.FromValidationError("Error: tagTableNames must contain at least one tag table name.");
@@ -296,10 +296,10 @@ public class TagTableTools {
   public static async Task<CallToolResult> PutTagTableDir(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory of the files, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<path>")] string rootDirectory,
-    [Description("Optional folder as names from the root; selects the start directory and the matching project folder; omit for the root")] string[]? path = null,
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Optional TIA folder path (not filesystem): folder names from the PLC root; selects start filesystem directory under rootDirectory and matching TIA project folder; omit for root")] string[]? path = null,
     [Description("Include subdirectories (default true)")] bool recursive = true) {
     var activity = ToolActivity.Start<TagTableTools>("Variablentabellen eines Verzeichnisses werden importiert");
     try {
@@ -328,10 +328,10 @@ public class TagTableTools {
   public static async Task<CallToolResult> PutTagTableFileList(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
-    [Description("The name of the Device")] string deviceName,
-    [Description("The name of the Device Item")] string deviceItemName,
-    [Description("Absolute root directory of the files, e.g. \"C:\\\\TiaFiles\"")] string rootDirectory,
-    [Description("Tag tables to import: TagTableName (required), Path (optional folder names; selects file subdirectory and folder for new tables)")] PutFileListItem[] items) {
+    [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
+    [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
+    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Tag tables to import: TagTableName (required), Path (optional TIA folder names, not filesystem; selects subdirectory under rootDirectory and TIA folder for new tables)")] PutFileListItem[] items) {
     if (items == null || items.Length == 0) {
       return TiaRestClient.FromValidationError("Error: items must contain at least one tag table.");
     }

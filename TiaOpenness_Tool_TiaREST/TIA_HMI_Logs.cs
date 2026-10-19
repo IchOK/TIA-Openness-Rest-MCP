@@ -25,8 +25,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional, wenn nur ein Unified-Gerät vorhanden ist)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional, wenn nur eines vorhanden ist</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <returns>JSON-String mit ListResult von LogInfo oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.LogsList)]
     static public string List(HttpListenerContext context) {
@@ -44,8 +44,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>LogPutRequest</body>
     /// <returns>JSON-String mit ChangeResult oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.LogsPut, "PUT")]
@@ -69,8 +69,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.HMI {
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Gerätename (optional)</query>
-    /// <query name="deviceItemName">Name des HMI-Elements (optional)</query>
+    /// <query name="deviceName">Name des WinCC-Unified-Geräts (DeviceName aus /api/hmi/devices/list); optional</query>
+    /// <query name="deviceItemName">Name des HMI-Geräteelements (DeviceItemName aus /api/hmi/devices/list); optional</query>
     /// <body>DeleteRequest</body>
     /// <returns>JSON-String mit ChangeResult oder Fehlermeldung</returns>
     [RestRoute(HmiRoutes.LogsDelete, "POST")]

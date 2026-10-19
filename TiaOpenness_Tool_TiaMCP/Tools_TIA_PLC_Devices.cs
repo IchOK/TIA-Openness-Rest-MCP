@@ -15,10 +15,12 @@ public class PlcDeviceTools {
     "BlockCount, UdtCount, TagTableCount.")]
   public static async Task<CallToolResult> ListDevices(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
-    [Description("The name of the project")] string projectName) {
+    [Description("The name of the project")] string projectName,
+    [Description("Optional: Project or LocalSession when names collide")] string? kind = null) {
     var activity = ToolActivity.Start<PlcDeviceTools>("PLC-Geräte werden abgerufen");
     try {
-      string route = $"{PlcRoutes.DevicesList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}";
+      string route = $"{PlcRoutes.DevicesList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}"
+        + TiaRestClient.KindQuery(kind);
       using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
