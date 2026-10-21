@@ -29,6 +29,9 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
     public bool ApiKeyRequired { get; set; }
     public string Summary { get; set; }
     public List<HelpParameter> Query { get; set; }
+    /// <summary>Strukturierte Body-Felder aus &lt;body name="…"&gt; (wie Query).</summary>
+    public List<HelpParameter> BodyParams { get; set; }
+    /// <summary>Freier Body-Hinweis aus &lt;body&gt; ohne name (Fallback, wenn keine BodyParams).</summary>
     public string Body { get; set; }
     public string Returns { get; set; }
   }
@@ -36,6 +39,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
   internal sealed class HelpParameter {
     public string Name { get; set; }
     public string Description { get; set; }
+    /// <summary>Optional: string (Standard), number, boolean, string[], json.</summary>
+    public string Type { get; set; }
   }
 
   /// <summary>
@@ -104,13 +109,31 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
       if (_docMembers != null && _docMembers.TryGetValue(MemberId(route.Handler), out XElement member)) {
         endpoint.Summary = DocText(member.Element("summary"));
         var query = member.Elements("query")
-          .Select(q => new HelpParameter { Name = (string)q.Attribute("name"), Description = DocText(q) })
+          .Where(q => !string.IsNullOrWhiteSpace((string)q.Attribute("name")))
+          .Select(ToHelpParameter)
           .ToList();
         endpoint.Query = query.Count > 0 ? query : null;
-        endpoint.Body = DocText(member.Element("body"));
+
+        var bodyElements = member.Elements("body").ToList();
+        var bodyParams = bodyElements
+          .Where(b => !string.IsNullOrWhiteSpace((string)b.Attribute("name")))
+          .Select(ToHelpParameter)
+          .ToList();
+        endpoint.BodyParams = bodyParams.Count > 0 ? bodyParams : null;
+        XElement bodyText = bodyElements.FirstOrDefault(b => string.IsNullOrWhiteSpace((string)b.Attribute("name")));
+        endpoint.Body = DocText(bodyText);
         endpoint.Returns = DocText(member.Element("returns"));
       }
       return endpoint;
+    }
+
+    static private HelpParameter ToHelpParameter(XElement element) {
+      string type = ((string)element.Attribute("type") ?? "").Trim();
+      return new HelpParameter {
+        Name = ((string)element.Attribute("name")).Trim(),
+        Description = DocText(element),
+        Type = type.Length > 0 ? type : null
+      };
     }
 
     /// <summary>
@@ -215,11 +238,25 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST {
           if (endpoint.Query != null) {
             html.Append("<div class=\"label\">Query</div><table>");
             foreach (HelpParameter parameter in endpoint.Query) {
-              html.Append("<tr><td>").Append(Encode(parameter.Name)).Append("</td><td>").Append(Encode(parameter.Description)).Append("</td></tr>");
+              html.Append("<tr><td>").Append(Encode(parameter.Name));
+              if (!string.IsNullOrEmpty(parameter.Type)) {
+                html.Append(" <span class=\"note\">(").Append(Encode(parameter.Type)).Append(")</span>");
+              }
+              html.Append("</td><td>").Append(Encode(parameter.Description)).Append("</td></tr>");
             }
             html.Append("</table>");
           }
-          if (endpoint.Body != null) {
+          if (endpoint.BodyParams != null) {
+            html.Append("<div class=\"label\">Body</div><table>");
+            foreach (HelpParameter parameter in endpoint.BodyParams) {
+              html.Append("<tr><td>").Append(Encode(parameter.Name));
+              if (!string.IsNullOrEmpty(parameter.Type)) {
+                html.Append(" <span class=\"note\">(").Append(Encode(parameter.Type)).Append(")</span>");
+              }
+              html.Append("</td><td>").Append(Encode(parameter.Description)).Append("</td></tr>");
+            }
+            html.Append("</table>");
+          } else if (endpoint.Body != null) {
             html.Append("<div class=\"label\">Body</div><div>").Append(Encode(endpoint.Body)).Append("</div>");
           }
           if (endpoint.Returns != null) {

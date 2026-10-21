@@ -46,7 +46,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
   /// </summary>
   internal class DirEntry {
     public string Name;        // Dateiname ohne Endung = Name des Elements
-    public string[] Path;      // Ordnerpfad aus den Unterverzeichnissen
+    public string[] Path;      // TIA-Ordner (Request-Path plus Unterverzeichnisse)
+    public string Directory;   // Dateisystem-Verzeichnis der Dateien dieses Elements
     public string Format;      // FormatSd oder FormatXml
     public string File;        // Inhaltsdatei (.s7dcl bzw. .xml)
   }
@@ -182,6 +183,69 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
     }
 
     /// <summary>
+    /// Prüft die PLC-Zielangaben eines Export-Bodies (ProcessId, ProjectName, DeviceName, DeviceItemName).
+    /// </summary>
+    /// <returns>Fehlermeldung oder null</returns>
+    static public string ValidatePlcTarget(PlcTargetBody target, out string processIdStr, out string projectName, out string deviceName, out string deviceItemName) {
+      processIdStr = null;
+      projectName = null;
+      deviceName = null;
+      deviceItemName = null;
+      if (target == null) {
+        return "Error: Request body is required.";
+      }
+      if (target.ProcessId <= 0) {
+        return "Error: ProcessId must be a positive integer.";
+      }
+      if (string.IsNullOrWhiteSpace(target.ProjectName)) {
+        return "Error: ProjectName must be provided.";
+      }
+      if (string.IsNullOrWhiteSpace(target.DeviceName)) {
+        return "Error: DeviceName must be provided.";
+      }
+      if (string.IsNullOrWhiteSpace(target.DeviceItemName)) {
+        return "Error: DeviceItemName must be provided.";
+      }
+      processIdStr = target.ProcessId.ToString();
+      projectName = target.ProjectName.Trim();
+      deviceName = target.DeviceName.Trim();
+      deviceItemName = target.DeviceItemName.Trim();
+      return null;
+    }
+
+    /// <summary>
+    /// Liest und prüft einen GetDir-Request-Body.
+    /// </summary>
+    /// <returns>Fehlermeldung oder null</returns>
+    static public string ReadGetDirRequest(HttpListenerContext context, out GetDirRequest request, out string processIdStr, out string projectName, out string deviceName, out string deviceItemName, out string directory, out bool recursive) {
+      request = null;
+      processIdStr = null;
+      projectName = null;
+      deviceName = null;
+      deviceItemName = null;
+      directory = null;
+      recursive = true;
+      try {
+        request = ReadBody<GetDirRequest>(context);
+      } catch (Exception ex) {
+        return $"Error: Invalid request body: {ex.Message}";
+      }
+      string targetError = ValidatePlcTarget(request, out processIdStr, out projectName, out deviceName, out deviceItemName);
+      if (targetError != null) {
+        return targetError;
+      }
+      if (request.Path != null && request.Path.Any(string.IsNullOrWhiteSpace)) {
+        return "Error: Path must not contain empty folder names.";
+      }
+      string dirError = cTiaExportHelpers.ResolveDirectory(request.Directory, out directory);
+      if (dirError != null) {
+        return dirError;
+      }
+      recursive = request.Recursive ?? true;
+      return null;
+    }
+
+    /// <summary>
     /// Ermittelt die Objektart einer Export-Datei anhand ihres Inhalts.
     /// </summary>
     /// <returns>KindBlock, KindUdt, KindTagTable oder null, wenn die Art nicht erkannt wird</returns>
@@ -214,25 +278,22 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
     }
 
     /// <summary>
-    /// Sucht in Root\Projekt\Ordnerpfad (optional mit Unterverzeichnissen) die Dateien einer Objektart.
+    /// Sucht in einem absoluten Dateisystem-Verzeichnis (optional mit Unterverzeichnissen) die Dateien einer Objektart.
+    /// path ist der TIA-Ordner, der diesem Verzeichnis entspricht; Unterverzeichnisse werden an path angehängt.
     /// Je Element gibt es eine Inhaltsdatei &lt;Name&gt;.s7dcl (SD, nicht bei Tagtabellen) oder &lt;Name&gt;.xml;
     /// Dateien anderer Objektarten werden übersprungen.
     /// </summary>
-    /// <param name="kind">KindBlock, KindUdt oder KindTagTable</param>
-    /// <param name="preferredFormat">Format, wenn .s7dcl und .xml mit gleichem Namen existieren; null = Fehler für das Element</param>
-    /// <param name="batch">Batch-Ergebnis; erhält Directory, übersprungene Dateien und Fehler</param>
-    /// <returns>Gefundene Elemente oder Fehler, wenn das Verzeichnis nicht existiert</returns>
-    static public ItemResult<List<DirEntry>> ScanDirectory<T>(string fullRoot, string projectName, string[] path, bool recursive, string kind, string preferredFormat, FileBatchResult<T> batch) {
-      string errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, projectName, path, out string directory);
+    static public ItemResult<List<DirEntry>> ScanDirectory<T>(string directory, string[] path, bool recursive, string kind, string preferredFormat, FileBatchResult<T> batch) {
+      string errorMessage = cTiaExportHelpers.ResolveDirectory(directory, out string fullDirectory);
       if (errorMessage != null) {
         return ItemResult<List<DirEntry>>.Fail(HttpStatusCode.BadRequest, errorMessage);
       }
-      batch.Directory = directory;
-      if (!Directory.Exists(directory)) {
-        return ItemResult<List<DirEntry>>.Fail(HttpStatusCode.NotFound, $"Error: Directory not found: {directory} (expected rootDirectory\\project\\folder path).");
+      batch.Directory = fullDirectory;
+      if (!Directory.Exists(fullDirectory)) {
+        return ItemResult<List<DirEntry>>.Fail(HttpStatusCode.NotFound, $"Error: Directory not found: {fullDirectory}.");
       }
       var entries = new List<DirEntry>();
-      ScanDirectory(directory, path ?? new string[0], recursive, kind, preferredFormat, entries, batch);
+      ScanDirectory(fullDirectory, path ?? new string[0], recursive, kind, preferredFormat, entries, batch);
       return ItemResult<List<DirEntry>>.Ok(entries);
     }
 
@@ -252,7 +313,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC.Helper {
           }
           string fileKind = DetectKind(file);
           if (fileKind == kind && !(kind == KindTagTable && option.Format == FormatSd)) {
-            candidates.Add(new DirEntry { Name = name, Path = path, Format = option.Format, File = file });
+            candidates.Add(new DirEntry { Name = name, Path = path, Directory = directory, Format = option.Format, File = file });
           } else {
             batch.Skipped.Add(new FileBatchSkipped {
               Name = name,

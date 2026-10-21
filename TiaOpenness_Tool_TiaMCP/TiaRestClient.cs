@@ -65,7 +65,7 @@ public static class TiaRestClient {
   public const string BatchResultDescription =
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "Data is a JSON object with DeviceName, DeviceItemName, PlcName, " +
-    "Directory (only for Dir tools: directory of the given folder path), " +
+    "Directory (only for Dir tools: the given filesystem directory), " +
     "Succeeded and Failed (counts), Items (one result object per successful element, same fields as the single-element tool returns), " +
     "Errors (one object per failed element: Name, Path, Files, StatusCode the single call would have returned, Error), " +
     "Skipped (Name, File, Reason, e.g. know-how-protected elements or files of another object kind). " +
@@ -167,6 +167,17 @@ public static class TiaRestClient {
       StatusCode = (int)HttpStatusCode.BadRequest,
       IsSuccess = false,
       Error = message
+    });
+  }
+
+  /// <summary>
+  /// Successful tool result that did not come from the REST API (e.g. local file operations).
+  /// </summary>
+  public static CallToolResult FromSuccess(object data) {
+    return ToToolResult(new McpApiResponse {
+      StatusCode = (int)HttpStatusCode.OK,
+      IsSuccess = true,
+      Data = JsonSerializer.SerializeToElement(data)
     });
   }
 

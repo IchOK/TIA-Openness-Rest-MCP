@@ -3,11 +3,11 @@
 
   var STORAGE_KEY = "tiaRest.apiKey";
   var CONTEXT_PARAMS = {
-    processId: true,
-    projectName: true,
+    processid: true,
+    projectname: true,
     kind: true,
-    deviceName: true,
-    deviceItemName: true
+    devicename: true,
+    deviceitemname: true
   };
 
   var els = {
@@ -132,13 +132,168 @@
     return ctx;
   }
 
+  function contextValue(ctx, name) {
+    if (!ctx || !name) return "";
+    if (Object.prototype.hasOwnProperty.call(ctx, name)) return ctx[name];
+    var lower = name.toLowerCase();
+    var key = Object.keys(ctx).find(function (k) { return k.toLowerCase() === lower; });
+    return key ? ctx[key] : "";
+  }
+
+  function isContextParam(name) {
+    return !!(name && CONTEXT_PARAMS[name.toLowerCase()]);
+  }
+
+  function paramType(param) {
+    return ((param && param.Type) || "string").toLowerCase();
+  }
+
   function shortPlaceholder(name, description) {
-    if (name === "rootDirectory") return "z. B. C:\\TiaFiles (Dateisystem, Export/Import)";
-    if (name === "path") return "TIA-Ordnernamen, kommagetrennt — oder Projektdatei-Pfad";
-    if (name === "deviceName") return "DeviceName";
-    if (name === "deviceItemName") return "DeviceItemName";
-    if (name === "targetDirectory") return "Dateisystem-Zielordner für Dearchivierung";
+    var n = (name || "").toLowerCase();
+    if (n === "rootdirectory" || n === "directory") return "z. B. C:\\TiaFiles\\…";
+    if (n === "path") return "TIA-Ordnernamen, kommagetrennt";
+    if (n === "devicename") return "DeviceName";
+    if (n === "deviceitemname") return "DeviceItemName";
+    if (n === "targetdirectory") return "Dateisystem-Zielordner";
     return description || "";
+  }
+
+  function exampleItems(description) {
+    var item = {
+      Directory: "C:\\TiaWorkspace\\Project\\PLC\\Folder"
+    };
+    var desc = description || "";
+    if (/BlockName/i.test(desc)) item.BlockName = "MyBlock";
+    if (/UdtName/i.test(desc)) item.UdtName = "MyUdt";
+    if (/TagTableName/i.test(desc)) item.TagTableName = "MyTagTable";
+    if (/Path/i.test(desc)) item.Path = ["Folder1"];
+    if (/Format/i.test(desc)) item.Format = "SimaticData/SD";
+    if (/BlockNumber/i.test(desc)) item.BlockNumber = 1;
+    if (!item.BlockName && !item.UdtName && !item.TagTableName) {
+      item.Name = "MyElement";
+      item.Path = ["Folder1"];
+    }
+    return [item];
+  }
+
+  function exampleValue(param, ctx, fillContext) {
+    var name = param.Name;
+    var type = paramType(param);
+    var lower = (name || "").toLowerCase();
+
+    if (fillContext && isContextParam(name)) {
+      var raw = contextValue(ctx, name);
+      if (type === "number") {
+        var n = Number(raw);
+        return Number.isNaN(n) ? 0 : n;
+      }
+      return raw || "";
+    }
+
+    if (type === "number") return 0;
+    if (type === "boolean") return true;
+    if (type === "string[]") return ["Folder1", "Folder2"];
+    if (type === "json") {
+      if (lower === "items") return exampleItems(param.Description);
+      return {};
+    }
+    if (lower === "directory" || lower === "rootdirectory" || lower === "targetdirectory") {
+      return "C:\\TiaWorkspace\\Project\\PLC\\Folder";
+    }
+    if (lower === "format") return "SimaticData/SD";
+    if (lower === "librarymode") return "InTest";
+    if (lower === "libraryversion") return "0.1.0";
+    if (lower === "libraryauthor") return "";
+    if (lower === "librarycomment") return "";
+    if (lower === "blockname") return "MyBlock";
+    if (lower === "udtname") return "MyUdt";
+    if (lower === "tagtablename") return "MyTagTable";
+    if (lower === "content") return "";
+    if (lower === "multilingualtext") return null;
+    return "";
+  }
+
+  function buildExampleBody(endpoint, ctx, fillContext) {
+    var params = (endpoint && endpoint.BodyParams) || [];
+    if (params.length === 0) {
+      return {};
+    }
+    var obj = {};
+    params.forEach(function (param) {
+      obj[param.Name] = exampleValue(param, ctx, fillContext);
+    });
+    return obj;
+  }
+
+  function bodyHintText(endpoint) {
+    var params = (endpoint && endpoint.BodyParams) || [];
+    if (params.length > 0) {
+      return "Vorlage aus der API-Doku · bekannte Felder aus dem Kontext · übrige Felder als Beispiel editierbar. "
+        + params.map(function (p) {
+          var t = paramType(p);
+          return p.Name + (t !== "string" ? " (" + t + ")" : "");
+        }).join(", ");
+    }
+    return (endpoint && endpoint.Body) || "JSON-Body gemäß Endpunktbeschreibung.";
+  }
+
+  function writeBodyTemplate(force) {
+    var ep = state.selected;
+    var needsBody = ep && /^(PUT|POST|PATCH)$/i.test(ep.Method);
+    els.bodyField.hidden = !needsBody;
+    if (!needsBody) {
+      els.requestBody.value = "";
+      els.bodyHint.textContent = "";
+      return;
+    }
+
+    els.bodyHint.textContent = bodyHintText(ep);
+    els.bodyHint.className = "hint muted";
+
+    if (!force && els.requestBody.dataset.endpoint === (ep.Method + " " + ep.Path) && els.requestBody.value.trim()) {
+      if (els.chkFillContext.checked) {
+        mergeContextIntoBody();
+      }
+      return;
+    }
+
+    var ctx = contextForEndpoint(ep);
+    var obj = buildExampleBody(ep, ctx, els.chkFillContext.checked);
+    els.requestBody.value = JSON.stringify(obj, null, 2);
+    els.requestBody.dataset.endpoint = ep.Method + " " + ep.Path;
+  }
+
+  function mergeContextIntoBody() {
+    var ep = state.selected;
+    if (!ep || !ep.BodyParams || ep.BodyParams.length === 0) return;
+    if (!els.chkFillContext.checked) return;
+
+    var obj;
+    try {
+      obj = JSON.parse(els.requestBody.value || "{}");
+      if (!obj || typeof obj !== "object" || Array.isArray(obj)) {
+        obj = {};
+      }
+    } catch (e) {
+      obj = buildExampleBody(ep, contextForEndpoint(ep), true);
+    }
+
+    var ctx = contextForEndpoint(ep);
+    var changed = false;
+    ep.BodyParams.forEach(function (param) {
+      if (!isContextParam(param.Name)) return;
+      var raw = contextValue(ctx, param.Name);
+      if (!raw) return;
+      var value = paramType(param) === "number" ? Number(raw) : raw;
+      if (paramType(param) === "number" && Number.isNaN(value)) return;
+      if (obj[param.Name] !== value) {
+        obj[param.Name] = value;
+        changed = true;
+      }
+    });
+    if (changed || !els.requestBody.value.trim()) {
+      els.requestBody.value = JSON.stringify(obj, null, 2);
+    }
   }
 
   function fillSelect(select, placeholder, items, labelFn) {
@@ -267,10 +422,6 @@
       opt.textContent = ep.Method + "  " + ep.Path;
       els.selEndpoint.lastChild.appendChild(opt);
     });
-
-    if (state.help.ApiKeyHeader && !apiKey()) {
-      // no default; user must enter key
-    }
   }
 
   function renderQueryParams() {
@@ -294,16 +445,18 @@
       var name = q.Name;
       var wrap = document.createElement("label");
       wrap.className = "field";
-      if (CONTEXT_PARAMS[name] && ctx[name]) {
+      var initial = isContextParam(name) ? (contextValue(ctx, name) || "") : "";
+      if (initial) {
         wrap.classList.add("from-context");
       }
+
       var title = document.createElement("span");
       title.textContent = name;
       var input = document.createElement("input");
       input.type = "text";
       input.dataset.param = name;
       input.placeholder = shortPlaceholder(name, q.Description);
-      input.value = ctx[name] || "";
+      input.value = initial;
       state.paramValues[name] = input.value;
       input.addEventListener("input", function () {
         state.paramValues[name] = input.value;
@@ -329,15 +482,17 @@
     var ctx = contextForEndpoint(state.selected);
     Array.prototype.forEach.call(els.queryParams.querySelectorAll("input[data-param]"), function (input) {
       var name = input.dataset.param;
-      if (!CONTEXT_PARAMS[name]) return;
-      if (Object.prototype.hasOwnProperty.call(ctx, name)) {
-        input.value = ctx[name];
-        state.paramValues[name] = ctx[name];
-        input.parentElement.classList.add("from-context");
-      } else if (CONTEXT_PARAMS[name]) {
+      if (!isContextParam(name)) return;
+      var value = contextValue(ctx, name);
+      if (value) {
+        input.value = value;
+        state.paramValues[name] = value;
+        if (input.parentElement) input.parentElement.classList.add("from-context");
+      } else if (input.parentElement) {
         input.parentElement.classList.remove("from-context");
       }
     });
+    mergeContextIntoBody();
     updateRequestPreview();
   }
 
@@ -348,8 +503,7 @@
     Object.keys(state.paramValues).forEach(function (name) {
       var value = state.paramValues[name];
       if (value == null || String(value).trim() === "") return;
-      // path=A&path=B: mehrere Werte kommagetrennt eingeben
-      if (name === "path" && String(value).indexOf(",") >= 0) {
+      if (name.toLowerCase() === "path" && String(value).indexOf(",") >= 0) {
         String(value).split(",").map(function (v) { return v.trim(); }).filter(Boolean)
           .forEach(function (v) { params.append("path", v); });
       } else {
@@ -375,16 +529,8 @@
     els.methodBadge.className = "method-badge" + (ep ? " " + ep.Method : "");
     els.endpointSummary.textContent = ep && ep.Summary ? ep.Summary : "";
 
-    var needsBody = ep && /^(PUT|POST|PATCH)$/i.test(ep.Method);
-    els.bodyField.hidden = !needsBody;
-    if (needsBody) {
-      els.bodyHint.textContent = ep.Body || "JSON-Body gemäß Endpunktbeschreibung.";
-      if (!els.requestBody.value.trim()) {
-        els.requestBody.value = "{\n  \n}";
-      }
-    }
-
     renderQueryParams();
+    writeBodyTemplate(true);
     updateRequestPreview();
   }
 

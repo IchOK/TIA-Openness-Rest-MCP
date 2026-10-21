@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch;
 
 namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
   /// <summary>
@@ -15,6 +16,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
     public string TagTableName { get; set; }
     public bool IsDefault { get; set; }
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
+    public string ModifiedDate { get; set; }   // UTC ISO-8601 (Openness PlcTagTable.ModifiedTimeStamp)
   }
 
   public class TagInfo {
@@ -38,6 +40,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
     public string TagTableName { get; set; }
     public bool IsDefault { get; set; }
     public string[] Path { get; set; }
+    public string ModifiedDate { get; set; }   // UTC ISO-8601 (Openness PlcTagTable.ModifiedTimeStamp)
     public List<TagInfo> Tags { get; set; }
     public List<ConstantInfo> UserConstants { get; set; }
     public List<ConstantInfo> SystemConstants { get; set; }
@@ -82,6 +85,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
     public string PlcName { get; set; }
     public string TagTableName { get; set; }
     public string[] Path { get; set; }
+    public string ModifiedDate { get; set; }   // UTC ISO-8601 nach dem Schreiben
     public bool Created { get; set; }          // true = Tabelle neu angelegt
     public List<Change> Changes { get; set; }
     public string[] Messages { get; set; }
@@ -95,16 +99,26 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
     public string DeviceItemName { get; set; }
     public string PlcName { get; set; }
     public string Format { get; set; }         // "SimaticML/XML"
-    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis der Datei
     public string[] Files { get; set; }        // vollständiger Pfad der exportierten Datei
+  }
+
+  /// <summary>
+  /// Request-Body für den Export einer Variablentabelle in eine XML-Datei (GetFile, HTTP POST).
+  /// Alle Parameter liegen im Body; die URL enthält nur den Routenpfad.
+  /// </summary>
+  public class GetFileRequest : PlcTargetBody {
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis; Datei wird direkt dort geschrieben
+    public string TagTableName { get; set; }
+    public string[] Path { get; set; }         // TIA-Ordner; null = ganzer PLC
   }
 
   /// <summary>
   /// Request-Body für das Anlegen oder Überschreiben einer Variablentabelle aus einer XML-Datei (PUT).
   /// </summary>
   public class PutFileRequest {
-    public string RootDirectory { get; set; }  // absoluter Dateisystem-Pfad (TIA/REST-Rechner) als Basis für Export/Import; Dateien unter Root\Projekt\Ordnerpfad
-    public string[] Path { get; set; }         // Dateiordner und Zielordner für neue Tabellen; null = bisheriger Ordner bzw. Wurzelordner
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis auf dem TIA/REST-Rechner
+    public string[] Path { get; set; }         // TIA-Ordner für neue Tabellen; null = bisheriger Ordner bzw. Wurzelordner
   }
 
   /// <summary>
@@ -125,15 +139,15 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.TagTable {
   /// Eine Variablentabelle eines Imports aus mehreren Dateien (PutFileList); Felder wie bei PutFile.
   /// </summary>
   public class PutFileListItem {
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis der Datei dieses Elements
     public string TagTableName { get; set; }
-    public string[] Path { get; set; }
+    public string[] Path { get; set; }         // TIA-Ordner für neue Tabellen; null = bisheriger Ordner bzw. Wurzelordner
   }
 
   /// <summary>
   /// Request-Body für den Import mehrerer Variablentabellen aus XML-Dateien (PutFileList).
   /// </summary>
   public class PutFileListRequest {
-    public string RootDirectory { get; set; }
     public List<PutFileListItem> Items { get; set; }
   }
 

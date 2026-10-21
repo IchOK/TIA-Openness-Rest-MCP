@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Text;
 using System.Text.Json;
 using Tophinke.TiaOpenness.Tool.Consts;
+using Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch;
 using Tophinke.TiaOpenness.Tool.Types.PLC.TagTable;
 
 namespace Tophinke.TiaOpenness.Tool.TiaMCP.PLC;
@@ -22,7 +23,8 @@ public class TagTableTools {
     "TagTables (array of the PLC's tag tables, each with: " +
     "TagTableName (tag table name, required for tia_plc_tagtables_get), " +
     "IsDefault (true if this is the PLC's default tag table), " +
-    "Path (string array of user group/folder names from the tag table root to the table; empty if the table is in the root)).")]
+    "Path (string array of user group/folder names from the tag table root to the table; empty if the table is in the root), " +
+    "ModifiedDate (UTC ISO-8601 last change of the table, Openness PlcTagTable.ModifiedTimeStamp)).")]
   public static async Task<CallToolResult> ListTagTables(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
     [Description("The name of the project")] string projectName,
@@ -50,6 +52,7 @@ public class TagTableTools {
     "TagTableName (tag table name), " +
     "IsDefault (true if this is the PLC's default tag table), " +
     "Path (string array of user group/folder names from the tag table root to the table; empty if the table is in the root), " +
+    "ModifiedDate (UTC ISO-8601 last change of the table, Openness PlcTagTable.ModifiedTimeStamp), " +
     "Tags (array of { Name, DataTypeName, LogicalAddress, Comment } — PLC tags with data type, absolute address such as \"%M10.0\" and comment), " +
     "UserConstants (array of { Name, DataTypeName, Value, Comment } — user-defined constants), " +
     "SystemConstants (array of { Name, DataTypeName, Value } — read-only system constants of the table). " +
@@ -160,14 +163,12 @@ public class TagTableTools {
 
   private const string FileLayoutDescription =
     "Tag tables are exchanged as SimaticML XML only (TIA Openness has no SIMATIC SD format for tag tables): " +
-    "one file <TagTableName>.xml in <rootDirectory>\\<project name>\\<tag table folder path>\\, mirroring the tag table folders of the project " +
-    "(invalid file name characters in project and folder names are replaced by '_'). The XML contains tags, user constants and all texts. " +
-    "Blocks and UDTs exported with the corresponding file tools use the same directory tree; the kinds are told apart by file content. " +
-    "rootDirectory is a path on the machine running TIA Portal and the REST API. ";
+    "one file <TagTableName>.xml written directly into directory. The XML contains tags, user constants and all texts. " +
+    "directory is an absolute filesystem folder on the TIA Portal/REST machine; path is the TIA tag table folder (not the filesystem). ";
 
   private const string ImportDescription =
     "The XML replaces the whole content of the tag table (TIA import with override). " +
-    "A new table is created in the project folder that matches the file directory (missing folders are created); " +
+    "A new table is created in the TIA folder Path (missing folders are created); " +
     "an existing table is overwritten in its current folder and never moved (Messages notes a differing Path). " +
     "Tag and constant names are unique across all tag tables of a PLC: names used in another table make the import fail. " +
     "Nothing is compiled. The files are not changed or deleted. ";
@@ -176,7 +177,7 @@ public class TagTableTools {
     "Exports a PLC tag table to a SimaticML XML file. " +
     FileLayoutDescription +
     "An existing file of the table is replaced; missing directories are created. " +
-    "Use tia_plc_tagtables_put_file with the same rootDirectory to import the (edited) file again. " +
+    "Use tia_plc_tagtables_put_file with the same directory and path to import the (edited) file again. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON object with: DeviceName, DeviceItemName, PlcName, TagTableName, IsDefault, " +
     "Path (tag table folder path in the project), Format (\"SimaticML/XML\"), Directory, Files (full path of the exported file).")]
@@ -186,12 +187,21 @@ public class TagTableTools {
     [Description("The name of the tag table")] string tagTableName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; the file is written under <rootDirectory>\\<project name>\\<TIA tag table folder path>")] string rootDirectory) {
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine; the file is written directly there")] string directory,
+    [Description("Optional TIA folder of the table (not filesystem): user group names from the PLC tag table root; omit to search the whole PLC")] string[]? path = null) {
     var activity = ToolActivity.Start<TagTableTools>($"Variablentabelle {tagTableName} wird in eine Datei exportiert");
     try {
-      string route = $"{TagTableRoutes.GetFile}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&tagTableName={Uri.EscapeDataString(tagTableName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}";
-
-      using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
+      var body = new GetFileRequest {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Directory = directory,
+        TagTableName = tagTableName,
+        Path = path
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.Client.PostAsync(TagTableRoutes.GetFile, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -200,8 +210,7 @@ public class TagTableTools {
 
   [McpServerTool(Name = "tia_plc_tagtables_put_file"), Description(
     "Creates or overwrites a PLC tag table from a SimaticML XML file (the layout written by tia_plc_tagtables_get_file). " +
-    "The file <TagTableName>.xml is read from <rootDirectory>\\<project name>\\<folder path>\\; " +
-    "<folder path> is Path if given, otherwise the current folder of an existing table, otherwise the root folder. " +
+    "directory is the absolute filesystem folder containing <TagTableName>.xml. path is the TIA folder for a new table. " +
     ImportDescription +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON object with: DeviceName, DeviceItemName, PlcName, TagTableName, IsDefault, Path (folder after the import), " +
@@ -212,14 +221,14 @@ public class TagTableTools {
     [Description("The name of the tag table (= file name without .xml)")] string tagTableName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; file under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Optional TIA folder path (not filesystem): user group names from the PLC tag table root; selects filesystem subdirectory under rootDirectory and TIA folder for a new table")] string[]? path = null) {
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine containing the XML file")] string directory,
+    [Description("Optional TIA folder for a new table (not filesystem): user group names from the PLC tag table root; omit = current folder or root")] string[]? path = null) {
     var activity = ToolActivity.Start<TagTableTools>($"Variablentabelle {tagTableName} wird aus einer Datei importiert");
     try {
       string route = $"{TagTableRoutes.PutFile}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&tagTableName={Uri.EscapeDataString(tagTableName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
       var body = new PutFileRequest {
-        RootDirectory = rootDirectory,
+        Directory = directory,
         Path = path
       };
       using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
@@ -231,7 +240,8 @@ public class TagTableTools {
   }
 
   [McpServerTool(Name = "tia_plc_tagtables_get_dir"), Description(
-    "Exports all tag tables of a tag table folder to XML files, like tia_plc_tagtables_get_file for every table, in a single TIA session. " +
+    "Exports all tag tables of a TIA tag table folder to XML files, like tia_plc_tagtables_get_file for every table, in a single TIA session. " +
+    "directory is the absolute filesystem folder that corresponds to path; TIA subfolders relative to path become subdirectories of directory. " +
     "path selects the folder (folder names from the tag table root; omit for the root folder, i.e. all tables of the PLC), " +
     "recursive (default true) includes all subfolders. " +
     FileLayoutDescription +
@@ -242,15 +252,22 @@ public class TagTableTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine corresponding to path")] string directory,
     [Description("Optional TIA tag table folder path (not filesystem): folder names from the PLC tag table root; omit for the root folder")] string[]? path = null,
     [Description("Include subfolders (default true)")] bool recursive = true) {
     var activity = ToolActivity.Start<TagTableTools>("Variablentabellen eines Ordners werden in Dateien exportiert");
     try {
-      string route = $"{TagTableRoutes.GetDir}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}&recursive={recursive}"
-        + TiaRestClient.PathQuery(path);
-
-      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.GetAsync(route);
+      var body = new GetDirRequest {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Directory = directory,
+        Path = path,
+        Recursive = recursive
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PostAsync(TagTableRoutes.GetDir, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -258,8 +275,8 @@ public class TagTableTools {
   }
 
   [McpServerTool(Name = "tia_plc_tagtables_get_file_list"), Description(
-    "Exports several tag tables to XML files, exactly like tia_plc_tagtables_get_file for each name in tagTableNames, in a single TIA session. " +
-    FileLayoutDescription +
+    "Exports several tag tables to XML files, exactly like tia_plc_tagtables_get_file for each entry in items, in a single TIA session. " +
+    "Each entry has Directory (absolute filesystem folder), TagTableName and optional Path (TIA folder; omit to search the whole PLC). " +
     "Each item: same fields as tia_plc_tagtables_get_file returns. " +
     TiaRestClient.BatchResultDescription)]
   public static async Task<CallToolResult> GetTagTableFileList(
@@ -267,17 +284,21 @@ public class TagTableTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Names of the tag tables to export")] string[] tagTableNames) {
-    if (tagTableNames == null || tagTableNames.All(string.IsNullOrWhiteSpace)) {
-      return TiaRestClient.FromValidationError("Error: tagTableNames must contain at least one tag table name.");
+    [Description("Tag tables to export: Directory (absolute filesystem folder, required), TagTableName (required), Path (optional TIA folder names)")] PutFileListItem[] items) {
+    if (items == null || items.Length == 0) {
+      return TiaRestClient.FromValidationError("Error: items must contain at least one tag table.");
     }
-    var activity = ToolActivity.Start<TagTableTools>($"{tagTableNames.Length} Variablentabellen werden in Dateien exportiert");
+    var activity = ToolActivity.Start<TagTableTools>($"{items.Length} Variablentabellen werden in Dateien exportiert");
     try {
-      string route = $"{TagTableRoutes.GetFileList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}"
-        + TiaRestClient.RepeatedQuery("tagTableName", tagTableNames);
-
-      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.GetAsync(route);
+      var body = new GetFileListRequest<PutFileListItem> {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Items = items.ToList()
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PostAsync(TagTableRoutes.GetFileList, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -286,8 +307,8 @@ public class TagTableTools {
 
   [McpServerTool(Name = "tia_plc_tagtables_put_dir"), Description(
     "Imports all tag table files of a directory, like tia_plc_tagtables_put_file for every file, in a single TIA session. " +
-    "Reads <rootDirectory>\\<project name>\\<path>\\ and, with recursive (default true), all subdirectories; " +
-    "every <Name>.xml whose content is a tag table export is imported as tag table <Name>; the subdirectory names are the folder names for new tables. " +
+    "directory is the absolute filesystem folder corresponding to path; with recursive (default true), subdirectories are included and appended to path. " +
+    "every <Name>.xml whose content is a tag table export is imported as tag table <Name>; subdirectory names are the TIA folder names for new tables. " +
     "Files of blocks and UDTs, and files whose content is not recognized, are listed in Skipped. " +
     ImportDescription +
     "Tables whose import fails in TIA are retried after the others. " +
@@ -298,15 +319,15 @@ public class TagTableTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Optional TIA folder path (not filesystem): folder names from the PLC root; selects start filesystem directory under rootDirectory and matching TIA project folder; omit for root")] string[]? path = null,
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine corresponding to path")] string directory,
+    [Description("Optional TIA folder path (not filesystem): folder names from the PLC tag table root; omit for the root folder")] string[]? path = null,
     [Description("Include subdirectories (default true)")] bool recursive = true) {
     var activity = ToolActivity.Start<TagTableTools>("Variablentabellen eines Verzeichnisses werden importiert");
     try {
       string route = $"{TagTableRoutes.PutDir}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
-      var body = new Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch.PutDirRequest {
-        RootDirectory = rootDirectory,
+      var body = new PutDirRequest {
+        Directory = directory,
         Path = path,
         Recursive = recursive
       };
@@ -320,7 +341,7 @@ public class TagTableTools {
 
   [McpServerTool(Name = "tia_plc_tagtables_put_file_list"), Description(
     "Imports several tag tables from XML files, exactly like tia_plc_tagtables_put_file for each entry in items, in a single TIA session. " +
-    "Each entry has TagTableName and optional Path with the same meaning as in tia_plc_tagtables_put_file. " +
+    "Each entry has Directory (absolute filesystem folder), TagTableName and optional Path with the same meaning as in tia_plc_tagtables_put_file. " +
     ImportDescription +
     "Tables whose import fails in TIA are retried after the others. " +
     "Each item: same fields as tia_plc_tagtables_put_file returns. " +
@@ -330,8 +351,7 @@ public class TagTableTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Tag tables to import: TagTableName (required), Path (optional TIA folder names, not filesystem; selects subdirectory under rootDirectory and TIA folder for new tables)")] PutFileListItem[] items) {
+    [Description("Tag tables to import: Directory (absolute filesystem folder, required), TagTableName (required), Path (optional TIA folder)")] PutFileListItem[] items) {
     if (items == null || items.Length == 0) {
       return TiaRestClient.FromValidationError("Error: items must contain at least one tag table.");
     }
@@ -340,7 +360,6 @@ public class TagTableTools {
       string route = $"{TagTableRoutes.PutFileList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
       var body = new PutFileListRequest {
-        RootDirectory = rootDirectory,
         Items = items.ToList()
       };
       using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");

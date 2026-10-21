@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch;
 using Tophinke.TiaOpenness.Tool.Types.PLC.Library;
 
 namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
@@ -21,6 +22,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
     public string ProgrammingLanguage { get; set; } // z. B. "LAD", "SCL", "DB"
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
     public LibraryInfo Library { get; set; }   // null = keine Instanz eines Bibliothekstyps
+    public string ModifiedDate { get; set; }   // UTC ISO-8601, z. B. "2026-10-21T11:18:00.000Z" (Openness PlcBlock.ModifiedDate)
   }
 
   public class  Data {
@@ -36,6 +38,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
     public string ProgrammingLanguage { get; set; } // z. B. "LAD", "SCL", "DB"
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
     public LibraryInfo Library { get; set; }   // null = keine Instanz eines Bibliothekstyps
+    public string ModifiedDate { get; set; }   // UTC ISO-8601 (Openness PlcBlock.ModifiedDate)
     public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"
     public string Content { get; set; }
     public string MultiLingualText { get; set; } 
@@ -49,7 +52,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
     public string DeviceItemName { get; set; }
     public string PlcName { get; set; }
     public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"
-    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis der Dateien
     public string[] Files { get; set; }        // vollständige Pfade der exportierten Dateien
   }
 
@@ -81,12 +84,22 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
   }
 
   /// <summary>
+  /// Request-Body für den Export eines Bausteins in Dateien (GetFile, HTTP POST).
+  /// Alle Parameter liegen im Body; die URL enthält nur den Routenpfad.
+  /// </summary>
+  public class GetFileRequest : PlcTargetBody {
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis; Dateien werden direkt dort geschrieben
+    public string BlockName { get; set; }
+    public string[] Path { get; set; }         // TIA-Ordner; null = ganzer PLC
+  }
+
+  /// <summary>
   /// Request-Body für das Anlegen oder Überschreiben eines Bausteins aus Dateien (PUT).
-  /// Die Dateien werden aus Root\Projekt\Ordnerpfad gelesen.
+  /// Directory ist das absolute Dateisystem-Verzeichnis mit den Dateien; Path ist der TIA-Zielordner.
   /// </summary>
   public class PutFileRequest {
-    public string RootDirectory { get; set; }  // absoluter Dateisystem-Pfad (TIA/REST-Rechner) als Basis für Export/Import; Dateien unter Root\Projekt\Ordnerpfad
-    public string[] Path { get; set; }         // Zielordner; null = bisheriger Ordner bzw. Wurzelordner
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis auf dem TIA/REST-Rechner
+    public string[] Path { get; set; }         // TIA-Zielordner; null = bisheriger Ordner bzw. Wurzelordner
     public string Format { get; set; }         // "SimaticData/SD" oder "SimaticML/XML"; leer = aus den vorhandenen Dateien ableiten
     public int? BlockNumber { get; set; }      // gewünschte Nummer; null = bisherige Nummer bzw. automatisch
     public string LibraryMode { get; set; }    // nur für Instanzen von Bibliothekstypen: "InTest" oder "Release"; leer = ablehnen
@@ -99,8 +112,9 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
   /// Ein Baustein eines Imports aus mehreren Dateien (PutFileList); Felder wie bei PutFile.
   /// </summary>
   public class PutFileListItem {
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis der Dateien dieses Elements
     public string BlockName { get; set; }
-    public string[] Path { get; set; }         // Ordner; null = bisheriger Ordner bzw. Wurzelordner
+    public string[] Path { get; set; }         // TIA-Ordner; null = bisheriger Ordner bzw. Wurzelordner
     public string Format { get; set; }         // leer = aus den vorhandenen Dateien ableiten
     public int? BlockNumber { get; set; }      // null = bisherige Nummer bzw. automatisch
   }
@@ -110,7 +124,6 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
   /// Die Bibliotheksoptionen gelten für alle Instanzen von Bibliothekstypen in der Liste.
   /// </summary>
   public class PutFileListRequest {
-    public string RootDirectory { get; set; }
     public List<PutFileListItem> Items { get; set; }
     public string LibraryMode { get; set; }
     public string LibraryVersion { get; set; }
@@ -132,7 +145,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.Block {
   /// Ergebnis des Anlegens oder Überschreibens eines Bausteins aus Dateien (PUT).
   /// </summary>
   public class PutFileResult : PutResult {
-    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis der Dateien
     public string[] Files { get; set; }        // vollständige Pfade der importierten Dateien
   }
 

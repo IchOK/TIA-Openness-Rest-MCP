@@ -8,10 +8,19 @@
 
   <ItemGroup>
     <PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\TiaOpenness_Tool_Consts\TiaOpenness_Tool_Shared.csproj" />
+  </ItemGroup>
+
+  <!-- Single source of truth: .opencode/skills → output/skills (MCP Skills Extension) -->
+  <ItemGroup>
+    <Content Include="..\.opencode\skills\**\*"
+             Link="skills\%(RecursiveDir)%(Filename)%(Extension)"
+             CopyToOutputDirectory="PreserveNewest"
+             CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -257,7 +257,15 @@ button.ghost,
 }
 
 .body-field { margin-top: 14px; }
+.body-field textarea {
+  width: 100%;
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  line-height: 1.4;
+  resize: vertical;
+}
 .hint { font-size: 0.82rem; margin-top: 4px; }
+.hint.err { color: var(--err); }
 
 .actions {
   display: flex;

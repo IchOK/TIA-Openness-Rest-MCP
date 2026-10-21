@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch;
 using Tophinke.TiaOpenness.Tool.Types.PLC.Library;
 
 namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
@@ -18,6 +19,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
     public string UdtName { get; set; }
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
     public LibraryInfo Library { get; set; }   // null = keine Instanz eines Bibliothekstyps
+    public string ModifiedDate { get; set; }   // UTC ISO-8601 (Openness PlcType.ModifiedDate)
   }
 
   public class  Data {
@@ -30,6 +32,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
     public string UdtName { get; set; }
     public string[] Path { get; set; }         // z. B. ["Plant", "Sub", "Unit", ...]
     public LibraryInfo Library { get; set; }   // null = keine Instanz eines Bibliothekstyps
+    public string ModifiedDate { get; set; }   // UTC ISO-8601 (Openness PlcType.ModifiedDate)
     public string Format { get; set; }
     public string Content { get; set; }
     public string MultiLingualText { get; set; }
@@ -43,7 +46,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
     public string DeviceItemName { get; set; }
     public string PlcName { get; set; }
     public string Format { get; set; }
-    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis der Dateien
     public string[] Files { get; set; }        // vollständige Pfade der exportierten Dateien
   }
 
@@ -74,12 +77,22 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
   }
 
   /// <summary>
+  /// Request-Body für den Export eines Datentyps in Dateien (GetFile, HTTP POST).
+  /// Alle Parameter liegen im Body; die URL enthält nur den Routenpfad.
+  /// </summary>
+  public class GetFileRequest : PlcTargetBody {
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis; Dateien werden direkt dort geschrieben
+    public string UdtName { get; set; }
+    public string[] Path { get; set; }         // TIA-Ordner; null = ganzer PLC
+  }
+
+  /// <summary>
   /// Request-Body für das Anlegen oder Überschreiben eines Datentyps aus Dateien (PUT).
-  /// Die Dateien werden aus Root\Projekt\Ordnerpfad gelesen.
+  /// Directory ist das absolute Dateisystem-Verzeichnis mit den Dateien; Path ist der TIA-Zielordner für neue UDTs.
   /// </summary>
   public class PutFileRequest {
-    public string RootDirectory { get; set; }  // absoluter Dateisystem-Pfad (TIA/REST-Rechner) als Basis für Export/Import; Dateien unter Root\Projekt\Ordnerpfad
-    public string[] Path { get; set; }         // Dateiordner und Zielordner für neue UDTs; null = bisheriger Ordner bzw. Wurzelordner
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis auf dem TIA/REST-Rechner
+    public string[] Path { get; set; }         // TIA-Ordner für neue UDTs; null = bisheriger Ordner bzw. Wurzelordner
     public string Format { get; set; }         // leer = aus den vorhandenen Dateien ableiten
     public string LibraryMode { get; set; }
     public string LibraryVersion { get; set; }
@@ -101,7 +114,7 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
   /// Ergebnis des Anlegens oder Überschreibens eines Datentyps aus Dateien (PUT).
   /// </summary>
   public class PutFileResult : PutResult {
-    public string Directory { get; set; }      // Root\Projekt\Ordnerpfad
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis der Dateien
     public string[] Files { get; set; }        // vollständige Pfade der importierten Dateien
   }
 
@@ -109,8 +122,9 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
   /// Ein Datentyp eines Imports aus mehreren Dateien (PutFileList); Felder wie bei PutFile.
   /// </summary>
   public class PutFileListItem {
+    public string Directory { get; set; }      // absolutes Dateisystem-Verzeichnis der Dateien dieses Elements
     public string UdtName { get; set; }
-    public string[] Path { get; set; }
+    public string[] Path { get; set; }         // TIA-Ordner für neue UDTs; null = bisheriger Ordner bzw. Wurzelordner
     public string Format { get; set; }
   }
 
@@ -118,7 +132,6 @@ namespace Tophinke.TiaOpenness.Tool.Types.PLC.UDT {
   /// Request-Body für den Import mehrerer Datentypen aus Dateien (PutFileList).
   /// </summary>
   public class PutFileListRequest {
-    public string RootDirectory { get; set; }
     public List<PutFileListItem> Items { get; set; }
     public string LibraryMode { get; set; }
     public string LibraryVersion { get; set; }

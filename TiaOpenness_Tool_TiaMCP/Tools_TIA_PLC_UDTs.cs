@@ -25,10 +25,8 @@ public class UDTTools {
     "Use tia_plc_udts_discard_type_version to throw away an in-test version. Other instances of the type in the project are not updated. ";
 
   private const string FileLayoutDescription =
-    "Files: <UdtName>.s7dcl plus <UdtName>.s7res (if the UDT has multilingual texts) in <rootDirectory>\\<project name>\\<type folder path>\\, " +
-    "mirroring the type folders of the project (invalid file name characters in project and folder names are replaced by '_'). " +
-    "Blocks and tag tables exported with the corresponding file tools use the same directory tree; the kinds are told apart by file content. " +
-    "rootDirectory is a path on the machine running TIA Portal and the REST API. ";
+    "Files: <UdtName>.s7dcl plus <UdtName>.s7res (if the UDT has multilingual texts) written directly into directory. " +
+    "directory is an absolute filesystem folder on the TIA Portal/REST machine; path is the TIA type folder (not the filesystem). ";
 
   [McpServerTool(Name = "tia_plc_udts_list"), Description(
     "Returns a list of all PLC user-defined types (UDTs) of a specific TIA project. " +
@@ -42,6 +40,7 @@ public class UDTTools {
     "Udts (array of the PLC's UDTs, each with: " +
     "UdtName (UDT name, required for tia_plc_udts_get), " +
     "Path (string array of user group/folder names from the type group root to the UDT; empty if the UDT is in the root), " +
+    "ModifiedDate (UTC ISO-8601 last change of the UDT, Openness PlcType.ModifiedDate), " +
     LibraryInfoDescription + ").")]
   public static async Task<CallToolResult> ListUdts(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
@@ -70,6 +69,7 @@ public class UDTTools {
     "UdtName (UDT name), " +
     "Path (string array of user group/folder names from the type group root to the UDT; empty if the UDT is in the root), " +
     LibraryInfoDescription + ", " +
+    "ModifiedDate (UTC ISO-8601 last change of the UDT), " +
     "Format (always \"SimaticData/SD\"), " +
     "Content (full UDT text in SIMATIC SD / .s7dcl form: type declaration and members), " +
     "MultiLingualText (content of the .s7res file with the multilingual member comments. " +
@@ -115,6 +115,7 @@ public class UDTTools {
     "DeviceName, DeviceItemName, PlcName, UdtName, " +
     "Path (folder of the UDT after the import), " +
     LibraryInfoDescription + " after the call, " +
+    "ModifiedDate (UTC ISO-8601 after the import), " +
     "Created (true = new UDT, false = existing UDT overwritten), " +
     "Format (format used for the import), " +
     "Messages (notes and messages reported by TIA Portal during the import, incl. the library steps).")]
@@ -162,10 +163,11 @@ public class UDTTools {
     "Exports a PLC user-defined type (UDT) to files instead of returning its content (same UDT selection as tia_plc_udts_get). " +
     FileLayoutDescription +
     "Existing .s7dcl/.s7res/.xml files of the UDT in that directory are replaced; missing directories are created. " +
-    "Use tia_plc_udts_put_file with the same rootDirectory to import the (edited) files again. " +
+    "Use tia_plc_udts_put_file with the same directory and path to import the (edited) files again. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON object with: DeviceName, DeviceItemName, PlcName, UdtName, " +
     "Path (type folder path in the project), " + LibraryInfoDescription + ", " +
+    "ModifiedDate (UTC ISO-8601 last change of the UDT), " +
     "Format (\"SimaticData/SD\"), Directory (directory the files were written to), Files (full paths of the exported files).")]
   public static async Task<CallToolResult> GetUdtFile(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
@@ -173,12 +175,21 @@ public class UDTTools {
     [Description("The name of the UDT")] string udtName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files are written under <rootDirectory>\\<project name>\\<TIA UDT folder path>")] string rootDirectory) {
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine; files are written directly there")] string directory,
+    [Description("Optional TIA folder of the UDT (not filesystem): user group names from the PLC type root; omit to search the whole PLC")] string[]? path = null) {
     var activity = ToolActivity.Start<UDTTools>($"Datentyp {udtName} wird in Dateien exportiert");
     try {
-      string route = $"{UDTRoutes.GetFile}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&udtName={Uri.EscapeDataString(udtName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}";
-
-      using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
+      var body = new GetFileRequest {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Directory = directory,
+        UdtName = udtName,
+        Path = path
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.Client.PostAsync(UDTRoutes.GetFile, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -187,12 +198,11 @@ public class UDTTools {
 
   [McpServerTool(Name = "tia_plc_udts_put_file"), Description(
     "Creates a new UDT or overwrites an existing UDT with the same name from files (same behavior as tia_plc_udts_put, but without passing the content). " +
-    "The files are read from <rootDirectory>\\<project name>\\<folder path>\\, the layout written by tia_plc_udts_get_file; " +
-    "<folder path> is Path if given, otherwise the current folder of an existing UDT, otherwise the root folder. " +
+    "directory is the absolute filesystem folder containing <UdtName>.s7dcl (+ optional .s7res) or <UdtName>.xml. " +
+    "path is the TIA folder for a new UDT; an existing UDT is overwritten in its current folder and never moved. " +
     "Expected files: <UdtName>.s7dcl plus optional <UdtName>.s7res for Format \"SimaticData/SD\", or <UdtName>.xml for Format \"SimaticML/XML\". " +
     "If format is omitted, it is derived from the existing files; if both exist, format is required. " +
     "For SimaticData/SD every text ID referenced in the .s7dcl file needs an entry in the .s7res file. " +
-    "A new UDT is created in folder Path (missing folders are created); an existing UDT is overwritten in its current folder and never moved. " +
     "Know-how-protected UDTs cannot be overwritten. Nothing is compiled. The files are not changed or deleted. " +
     LibraryWriteDescription +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
@@ -204,9 +214,9 @@ public class UDTTools {
     [Description("The name of the UDT")] string udtName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine containing the UDT files")] string directory,
     [Description("Optional \"SimaticData/SD\" or \"SimaticML/XML\"; omit to derive it from the existing files")] string? format = null,
-    [Description("Optional TIA folder path (not filesystem): user group names from the PLC type root, e.g. [\"Plant\", \"Unit1\"]; selects filesystem subdirectory under rootDirectory and TIA folder for a new UDT")] string[]? path = null,
+    [Description("Optional TIA folder for a new UDT (not filesystem): user group names from the PLC type root; omit = current folder or root")] string[]? path = null,
     [Description("Only for instances of library types: \"InTest\" (write as in-test version) or \"Release\" (write and release); omit for normal UDTs")] string? libraryMode = null,
     [Description("Only with libraryMode \"Release\": version number to release, e.g. \"0.1.37\"; omit to use the number of the in-test version")] string? libraryVersion = null,
     [Description("Only with libraryMode \"Release\": author of the released version; omit to keep the author of the version")] string? libraryAuthor = null,
@@ -216,7 +226,7 @@ public class UDTTools {
       string route = $"{UDTRoutes.PutFile}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&udtName={Uri.EscapeDataString(udtName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
       var body = new PutFileRequest {
-        RootDirectory = rootDirectory,
+        Directory = directory,
         Path = path,
         Format = format,
         LibraryMode = libraryMode,
@@ -233,12 +243,13 @@ public class UDTTools {
   }
 
   [McpServerTool(Name = "tia_plc_udts_get_dir"), Description(
-    "Exports all UDTs of a type folder to files, like tia_plc_udts_get_file for every UDT, in a single TIA session. " +
+    "Exports all UDTs of a TIA type folder to files, like tia_plc_udts_get_file for every UDT, in a single TIA session. " +
+    "directory is the absolute filesystem folder that corresponds to path; TIA subfolders relative to path become subdirectories of directory. " +
     "path selects the type folder (folder names from the type group root; omit for the root folder, i.e. all UDTs of the PLC), " +
     "recursive (default true) includes all subfolders. " +
     FileLayoutDescription +
     "Existing files of the exported UDTs are replaced; other files are not touched. Know-how-protected UDTs are skipped. " +
-    "Use tia_plc_udts_put_dir or tia_plc_udts_put_file_list with the same rootDirectory to import the (edited) files again. " +
+    "Use tia_plc_udts_put_dir with the same directory and path to import the (edited) files again. " +
     "Each item: same fields as tia_plc_udts_get_file returns. " +
     TiaRestClient.BatchResultDescription)]
   public static async Task<CallToolResult> GetUdtDir(
@@ -246,15 +257,22 @@ public class UDTTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine corresponding to path")] string directory,
     [Description("Optional TIA UDT folder path (not filesystem): folder names from the PLC type root, e.g. [\"TopCtrl_Func\"]; omit for the root folder")] string[]? path = null,
     [Description("Include subfolders (default true)")] bool recursive = true) {
     var activity = ToolActivity.Start<UDTTools>("Datentypen eines Ordners werden in Dateien exportiert");
     try {
-      string route = $"{UDTRoutes.GetDir}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}&recursive={recursive}"
-        + TiaRestClient.PathQuery(path);
-
-      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.GetAsync(route);
+      var body = new GetDirRequest {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Directory = directory,
+        Path = path,
+        Recursive = recursive
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PostAsync(UDTRoutes.GetDir, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -262,8 +280,8 @@ public class UDTTools {
   }
 
   [McpServerTool(Name = "tia_plc_udts_get_file_list"), Description(
-    "Exports several UDTs to files, exactly like tia_plc_udts_get_file for each name in udtNames, in a single TIA session. " +
-    FileLayoutDescription +
+    "Exports several UDTs to files, exactly like tia_plc_udts_get_file for each entry in items, in a single TIA session. " +
+    "Each entry has Directory (absolute filesystem folder), UdtName and optional Path (TIA folder; omit to search the whole PLC). " +
     "Each item: same fields as tia_plc_udts_get_file returns. " +
     TiaRestClient.BatchResultDescription)]
   public static async Task<CallToolResult> GetUdtFileList(
@@ -271,17 +289,21 @@ public class UDTTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Names of the UDTs to export")] string[] udtNames) {
-    if (udtNames == null || udtNames.All(string.IsNullOrWhiteSpace)) {
-      return TiaRestClient.FromValidationError("Error: udtNames must contain at least one UDT name.");
+    [Description("UDTs to export: Directory (absolute filesystem folder, required), UdtName (required), Path (optional TIA folder names)")] PutFileListItem[] items) {
+    if (items == null || items.Length == 0) {
+      return TiaRestClient.FromValidationError("Error: items must contain at least one UDT.");
     }
-    var activity = ToolActivity.Start<UDTTools>($"{udtNames.Length} Datentypen werden in Dateien exportiert");
+    var activity = ToolActivity.Start<UDTTools>($"{items.Length} Datentypen werden in Dateien exportiert");
     try {
-      string route = $"{UDTRoutes.GetFileList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}"
-        + TiaRestClient.RepeatedQuery("udtName", udtNames);
-
-      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.GetAsync(route);
+      var body = new GetFileListRequest<PutFileListItem> {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Items = items.ToList()
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PostAsync(UDTRoutes.GetFileList, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -290,9 +312,9 @@ public class UDTTools {
 
   [McpServerTool(Name = "tia_plc_udts_put_dir"), Description(
     "Imports all UDT files of a directory, like tia_plc_udts_put_file for every file, in a single TIA session. " +
-    "Reads <rootDirectory>\\<project name>\\<path>\\ and, with recursive (default true), all subdirectories; " +
+    "directory is the absolute filesystem folder corresponding to path; with recursive (default true), subdirectories are included and appended to path. " +
     "every <Name>.s7dcl (+ optional <Name>.s7res) or <Name>.xml whose content is a UDT is imported as UDT <Name>. " +
-    "New UDTs are created in the project folder that matches their directory (subdirectory names = folder names, missing folders are created); " +
+    "New UDTs are created in the TIA folder path plus relative subdirectory names (missing folders are created); " +
     "existing UDTs are overwritten in their current folder and never moved. " +
     "Files of blocks and tag tables, and files whose content is not recognized, are listed in Skipped. " +
     "If <Name>.s7dcl and <Name>.xml both exist, format selects one; without format that UDT is reported in Errors. " +
@@ -307,8 +329,8 @@ public class UDTTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Optional TIA folder path (not filesystem): folder names from the PLC root; selects start filesystem directory under rootDirectory and matching TIA project folder; omit for root")] string[]? path = null,
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine corresponding to path")] string directory,
+    [Description("Optional TIA folder path (not filesystem): folder names from the PLC type root; omit for the root folder")] string[]? path = null,
     [Description("Include subdirectories (default true)")] bool recursive = true,
     [Description("Only needed if <Name>.s7dcl and <Name>.xml both exist: \"SimaticData/SD\" or \"SimaticML/XML\"")] string? format = null) {
     var activity = ToolActivity.Start<UDTTools>("Datentypen eines Verzeichnisses werden importiert");
@@ -316,7 +338,7 @@ public class UDTTools {
       string route = $"{UDTRoutes.PutDir}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
       var body = new PutDirRequest {
-        RootDirectory = rootDirectory,
+        Directory = directory,
         Path = path,
         Recursive = recursive,
         Format = format
@@ -331,7 +353,7 @@ public class UDTTools {
 
   [McpServerTool(Name = "tia_plc_udts_put_file_list"), Description(
     "Imports several UDTs from files, exactly like tia_plc_udts_put_file for each entry in items, in a single TIA session. " +
-    "Each entry has UdtName and optional Path and Format with the same meaning as in tia_plc_udts_put_file. " +
+    "Each entry has Directory (absolute filesystem folder), UdtName and optional Path and Format with the same meaning as in tia_plc_udts_put_file. " +
     "The library options apply to every instance of a library type in the list; without libraryMode such UDTs fail with StatusCode 409. " +
     LibraryWriteDescription +
     "UDTs whose import fails in TIA are retried after the others, so the order of the entries does not matter for dependencies. " +
@@ -343,8 +365,7 @@ public class UDTTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("UDTs to import: UdtName (required), Path (optional TIA folder names, not filesystem; selects subdirectory under rootDirectory and TIA folder for new UDTs), Format (optional)")] PutFileListItem[] items,
+    [Description("UDTs to import: Directory (absolute filesystem folder, required), UdtName (required), Path (optional TIA folder), Format (optional)")] PutFileListItem[] items,
     [Description("Only for instances of library types: \"InTest\" or \"Release\"; omit for normal UDTs")] string? libraryMode = null,
     [Description("Only with libraryMode \"Release\": version number to release, e.g. \"0.1.37\"")] string? libraryVersion = null,
     [Description("Only with libraryMode \"Release\": author of the released versions")] string? libraryAuthor = null,
@@ -357,7 +378,6 @@ public class UDTTools {
       string route = $"{UDTRoutes.PutFileList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
       var body = new PutFileListRequest {
-        RootDirectory = rootDirectory,
         Items = items.ToList(),
         LibraryMode = libraryMode,
         LibraryVersion = libraryVersion,

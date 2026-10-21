@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Tophinke.TiaOpenness.Tool.Consts;
 using Tophinke.TiaOpenness.Tool.Types.PLC.Block;
+using Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch;
 
 namespace Tophinke.TiaOpenness.Tool.TiaMCP.PLC;
 
@@ -51,6 +52,7 @@ public class BlockTools {
     "BlockType (Openness type name such as FC, FB, OB, GlobalDB, …), " +
     "ProgrammingLanguage (e.g. LAD, SCL, FBD, STL, DB), " +
     "Path (string array of user group/folder names from the block group root to the block; empty if the block is in the root), " +
+    "ModifiedDate (UTC ISO-8601 last change of the block, Openness PlcBlock.ModifiedDate), " +
     LibraryInfoDescription + ").")]
   public static async Task<CallToolResult> ListBlocks(
     [Description("The ProcessId of the TIA Portal instance")] int processId,
@@ -102,6 +104,7 @@ public class BlockTools {
     "ProgrammingLanguage (e.g. LAD, SCL, FBD, STL, DB), " +
     "Path (string array of user group/folder names from the block group root to the block; empty if the block is in the root), " +
     LibraryInfoDescription + ", " +
+    "ModifiedDate (UTC ISO-8601 last change of the block), " +
     "Format (\"SimaticData/SD\" for LAD, FBD, SCL and DB incl. F-variants, or \"SimaticML/XML\" for all other languages such as STL or GRAPH, " +
     "and as fallback when the SD export fails, e.g. for blocks last modified before TIA Portal V20 Update 4), " +
     "Content (block text: SIMATIC SD (.s7dcl) or Simatic ML XML with interface, attributes and program code where applicable), " +
@@ -153,6 +156,7 @@ public class BlockTools {
     "DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, ProgrammingLanguage, " +
     "Path (folder of the block after the import), " +
     LibraryInfoDescription + " after the call, " +
+    "ModifiedDate (UTC ISO-8601 after the import), " +
     "Created (true = new block, false = existing block overwritten), " +
     "Format (format used for the import), " +
     "Messages (messages reported by TIA Portal during the import, incl. the library steps).")]
@@ -200,18 +204,18 @@ public class BlockTools {
 
   [McpServerTool(Name = "tia_plc_blocks_get_file"), Description(
     "Exports a PLC block to files instead of returning its content (same block selection as tia_plc_blocks_get). " +
-    "The files are written to <rootDirectory>\\<project name>\\<block folder path>\\, mirroring the block folders of the project " +
-    "(invalid file name characters in project and folder names are replaced by '_'); missing directories are created. " +
+    "directory is the absolute filesystem folder on the TIA Portal/REST machine; files are written directly there (missing directories are created). " +
+    "path is the TIA block folder (user group names from the PLC root, e.g. [\"Plant\", \"Unit1\"]); omit to search the whole PLC. " +
     "Files: <BlockName>.s7dcl plus <BlockName>.s7res (if the block has multilingual texts) for Format \"SimaticData/SD\" (LAD, FBD, SCL, DB incl. F-variants), " +
     "or <BlockName>.xml for Format \"SimaticML/XML\" (all other languages such as STL or GRAPH). " +
     "Existing .s7dcl/.s7res/.xml files of the block in that directory are replaced. " +
-    "rootDirectory is a path on the machine running TIA Portal and the REST API. " +
-    "Use tia_plc_blocks_put_file with the same rootDirectory to import the (edited) files again. " +
+    "Use tia_plc_blocks_put_file with the same directory and path to import the (edited) files again. " +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON object with: " +
     "DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, ProgrammingLanguage, " +
     "Path (block folder path in the project), " +
     LibraryInfoDescription + ", " +
+    "ModifiedDate (UTC ISO-8601 last change of the block), " +
     "Format (\"SimaticData/SD\" or \"SimaticML/XML\"), " +
     "Directory (full path of the directory the files were written to), " +
     "Files (array of full paths of the exported files).")]
@@ -221,13 +225,21 @@ public class BlockTools {
     [Description("The name of the block")] string blockName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files are written under <rootDirectory>\\<project name>\\<TIA block folder path>")] string rootDirectory) {
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine; files are written directly there, e.g. \"C:\\\\TiaWorkspace\\\\MyProject\\\\PLC_1\\\\Plant\\\\Unit1\"")] string directory,
+    [Description("Optional TIA folder of the block (not filesystem): user group names from the PLC root, e.g. [\"Plant\", \"Unit1\"]; omit to search the whole PLC")] string[]? path = null) {
     var activity = ToolActivity.Start<BlockTools>($"Baustein {blockName} wird in Dateien exportiert");
     try {
-      string safeProjectName = Uri.EscapeDataString(projectName);
-      string route = $"{BlockRoutes.GetFile}?processId={processId}&projectName={safeProjectName}&blockName={Uri.EscapeDataString(blockName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}";
-
-      using HttpResponseMessage response = await TiaRestClient.Client.GetAsync(route);
+      var body = new GetFileRequest {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Directory = directory,
+        BlockName = blockName,
+        Path = path
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.Client.PostAsync(BlockRoutes.GetFile, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -236,21 +248,21 @@ public class BlockTools {
 
   [McpServerTool(Name = "tia_plc_blocks_put_file"), Description(
     "Creates a new PLC block or overwrites an existing block with the same name from files (same behavior as tia_plc_blocks_put, but without passing the content). " +
-    "The files are read from <rootDirectory>\\<project name>\\<folder path>\\, the layout written by tia_plc_blocks_get_file; " +
-    "<folder path> is Path if given, otherwise the current folder of an existing block, otherwise the root folder. " +
+    "directory is the absolute filesystem folder containing <BlockName>.s7dcl (+ optional .s7res) or <BlockName>.xml. " +
+    "path is the TIA target folder (user group names from the PLC root); omit to keep the current folder of an existing block or to use the root for a new block. " +
     "Expected files: <BlockName>.s7dcl plus optional <BlockName>.s7res for Format \"SimaticData/SD\", or <BlockName>.xml for Format \"SimaticML/XML\". " +
     "If format is omitted, it is derived from the existing files (.s7dcl = SimaticData/SD, .xml = SimaticML/XML); if both exist, format is required. " +
     "For SimaticData/SD every text ID referenced in the .s7dcl file (e.g. { S7_MLC := \"MLC_3SC\" }) needs an entry in the .s7res file. " +
-    "Path also selects the target folder in the project (missing folders are created); if an existing block lives in a different folder, it is moved. " +
+    "Path selects the target folder in the project (missing folders are created); if an existing block lives in a different folder, it is moved. " +
     "An overwritten block keeps its block number; pass blockNumber to set a specific number. " +
     "Know-how-protected blocks cannot be overwritten. The block is not compiled. The files are not changed or deleted. " +
-    "rootDirectory is a path on the machine running TIA Portal and the REST API. " +
     LibraryWriteDescription +
     "Response: McpApiResponse with StatusCode, IsSuccess, optional Error, and Data. " +
     "On success, Data is a JSON object with: " +
     "DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, ProgrammingLanguage, " +
     "Path (folder of the block after the import), " +
     LibraryInfoDescription + " after the call, " +
+    "ModifiedDate (UTC ISO-8601 after the import), " +
     "Created (true = new block, false = existing block overwritten), " +
     "Format (format used for the import), " +
     "Messages (messages reported by TIA Portal during the import, incl. the library steps), " +
@@ -262,9 +274,9 @@ public class BlockTools {
     [Description("The name of the block")] string blockName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine containing the block files")] string directory,
     [Description("Optional \"SimaticData/SD\" or \"SimaticML/XML\"; omit to derive it from the existing files")] string? format = null,
-    [Description("Optional TIA folder path (not filesystem): user group names from the PLC root, e.g. [\"Plant\", \"Unit1\"]; selects both the filesystem subdirectory under rootDirectory and the TIA target folder; empty = root")] string[]? path = null,
+    [Description("Optional TIA target folder (not filesystem): user group names from the PLC root, e.g. [\"Plant\", \"Unit1\"]; omit = current folder of an existing block or root")] string[]? path = null,
     [Description("Optional block number; omit to keep the number of an existing block or to let TIA assign one for a new block")] int? blockNumber = null,
     [Description("Only for instances of library types: \"InTest\" (write as in-test version) or \"Release\" (write and release); omit for normal blocks")] string? libraryMode = null,
     [Description("Only with libraryMode \"Release\": version number to release, e.g. \"0.1.37\"; omit to use the number of the in-test version")] string? libraryVersion = null,
@@ -276,7 +288,7 @@ public class BlockTools {
       string route = $"{BlockRoutes.PutFile}?processId={processId}&projectName={safeProjectName}&blockName={Uri.EscapeDataString(blockName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
       var body = new PutFileRequest {
-        RootDirectory = rootDirectory,
+        Directory = directory,
         Path = path,
         Format = format,
         BlockNumber = blockNumber,
@@ -294,13 +306,12 @@ public class BlockTools {
   }
 
   [McpServerTool(Name = "tia_plc_blocks_get_dir"), Description(
-    "Exports all PLC blocks of a block folder to files, like tia_plc_blocks_get_file for every block; uses a single TIA session, so it is much faster than many single calls. " +
-    "path selects the block folder (folder names from the block group root; omit for the root folder, i.e. the whole PLC), " +
+    "Exports all PLC blocks of a TIA block folder to files, like tia_plc_blocks_get_file for every block; uses a single TIA session, so it is much faster than many single calls. " +
+    "directory is the absolute filesystem folder that corresponds to path; TIA subfolders relative to path become subdirectories of directory. " +
+    "path selects the TIA block folder (folder names from the block group root; omit for the root folder, i.e. the whole PLC), " +
     "recursive (default true) includes all subfolders. " +
-    "Each block is written to <rootDirectory>\\<project name>\\<block folder path>\\ as <BlockName>.s7dcl (+ .s7res) or <BlockName>.xml, replacing existing files of the block; " +
-    "other files in the directories are not touched. Know-how-protected blocks are skipped. " +
-    "UDTs and tag tables exported with tia_plc_udts_get_dir/tia_plc_tagtables_get_dir go to the same directory tree when their folders have the same names; the Put*Dir tools tell the kinds apart by file content. " +
-    "Use tia_plc_blocks_put_dir or tia_plc_blocks_put_file_list with the same rootDirectory to import the (edited) files again. " +
+    "Each block is written as <BlockName>.s7dcl (+ .s7res) or <BlockName>.xml, replacing existing files of the block; other files are not touched. Know-how-protected blocks are skipped. " +
+    "Use tia_plc_blocks_put_dir with the same directory and path to import the (edited) files again. " +
     "Each item: DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, ProgrammingLanguage, Path, " + LibraryInfoDescription + ", Format, Directory, Files. " +
     TiaRestClient.BatchResultDescription)]
   public static async Task<CallToolResult> GetBlockDir(
@@ -308,15 +319,22 @@ public class BlockTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files are written under <rootDirectory>\\<project name>\\<TIA block folder path>")] string rootDirectory,
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine corresponding to path, e.g. \"C:\\\\TiaWorkspace\\\\MyProject\\\\PLC_1\"")] string directory,
     [Description("Optional TIA block folder path (not filesystem): folder names from the PLC block root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; omit for the root folder")] string[]? path = null,
     [Description("Include subfolders (default true)")] bool recursive = true) {
     var activity = ToolActivity.Start<BlockTools>("Bausteine eines Ordners werden in Dateien exportiert");
     try {
-      string route = $"{BlockRoutes.GetDir}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}&recursive={recursive}"
-        + TiaRestClient.PathQuery(path);
-
-      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.GetAsync(route);
+      var body = new GetDirRequest {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Directory = directory,
+        Path = path,
+        Recursive = recursive
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PostAsync(BlockRoutes.GetDir, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -324,8 +342,8 @@ public class BlockTools {
   }
 
   [McpServerTool(Name = "tia_plc_blocks_get_file_list"), Description(
-    "Exports several PLC blocks to files, exactly like tia_plc_blocks_get_file for each name in blockNames, in a single TIA session. " +
-    "Each block is written to <rootDirectory>\\<project name>\\<block folder path>\\. " +
+    "Exports several PLC blocks to files, exactly like tia_plc_blocks_get_file for each entry in items, in a single TIA session. " +
+    "Each entry has Directory (absolute filesystem folder), BlockName and optional Path (TIA folder; omit to search the whole PLC). " +
     "Each item: DeviceName, DeviceItemName, PlcName, BlockName, BlockNumber, BlockType, ProgrammingLanguage, Path, " + LibraryInfoDescription + ", Format, Directory, Files. " +
     TiaRestClient.BatchResultDescription)]
   public static async Task<CallToolResult> GetBlockFileList(
@@ -333,17 +351,21 @@ public class BlockTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as export base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Names of the blocks to export")] string[] blockNames) {
-    if (blockNames == null || blockNames.All(string.IsNullOrWhiteSpace)) {
-      return TiaRestClient.FromValidationError("Error: blockNames must contain at least one block name.");
+    [Description("Blocks to export: Directory (absolute filesystem folder, required), BlockName (required), Path (optional TIA folder names)")] PutFileListItem[] items) {
+    if (items == null || items.Length == 0) {
+      return TiaRestClient.FromValidationError("Error: items must contain at least one block.");
     }
-    var activity = ToolActivity.Start<BlockTools>($"{blockNames.Length} Bausteine werden in Dateien exportiert");
+    var activity = ToolActivity.Start<BlockTools>($"{items.Length} Bausteine werden in Dateien exportiert");
     try {
-      string route = $"{BlockRoutes.GetFileList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}&rootDirectory={Uri.EscapeDataString(rootDirectory)}"
-        + TiaRestClient.RepeatedQuery("blockName", blockNames);
-
-      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.GetAsync(route);
+      var body = new GetFileListRequest<PutFileListItem> {
+        ProcessId = processId,
+        ProjectName = projectName,
+        DeviceName = deviceName,
+        DeviceItemName = deviceItemName,
+        Items = items.ToList()
+      };
+      using var httpContent = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+      using HttpResponseMessage response = await TiaRestClient.LongRunningClient.PostAsync(BlockRoutes.GetFileList, httpContent);
       return activity.Complete(await TiaRestClient.FromHttpResponseAsync(response));
     } catch (Exception ex) {
       return activity.Complete(TiaRestClient.FromException(ex));
@@ -352,9 +374,9 @@ public class BlockTools {
 
   [McpServerTool(Name = "tia_plc_blocks_put_dir"), Description(
     "Imports all block files of a directory, like tia_plc_blocks_put_file for every file, in a single TIA session. " +
-    "Reads <rootDirectory>\\<project name>\\<path>\\ and, with recursive (default true), all subdirectories; " +
+    "directory is the absolute filesystem folder corresponding to path; with recursive (default true), subdirectories are included and appended to path. " +
     "every <Name>.s7dcl (+ optional <Name>.s7res) or <Name>.xml whose content is a block is imported as block <Name> " +
-    "into the project folder that matches its directory (subdirectory names = folder names; missing folders are created, existing blocks in other folders are moved). " +
+    "into the TIA folder path plus relative subdirectory names (missing folders are created, existing blocks in other folders are moved). " +
     "Files of UDTs and tag tables, and files whose content is not recognized, are listed in Skipped. " +
     "If <Name>.s7dcl and <Name>.xml both exist, format selects one; without format that block is reported in Errors. " +
     "Existing blocks keep their block number. Instances of project library types are written as in-test version of their type " +
@@ -369,16 +391,16 @@ public class BlockTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files are read from <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Optional TIA folder path (not filesystem): folder names from the PLC root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; selects start filesystem directory under rootDirectory and matching TIA project folder; omit for root")] string[]? path = null,
+    [Description("Absolute filesystem directory on the TIA Portal/REST machine corresponding to path")] string directory,
+    [Description("Optional TIA folder path (not filesystem): folder names from the PLC root, e.g. [\"TopCtrl_Func\", \"Sequenz\"]; omit for the root folder")] string[]? path = null,
     [Description("Include subdirectories (default true)")] bool recursive = true,
     [Description("Only needed if <Name>.s7dcl and <Name>.xml both exist: \"SimaticData/SD\" or \"SimaticML/XML\"")] string? format = null) {
     var activity = ToolActivity.Start<BlockTools>("Bausteine eines Verzeichnisses werden importiert");
     try {
       string route = $"{BlockRoutes.PutDir}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
-      var body = new Tophinke.TiaOpenness.Tool.Types.PLC.FileBatch.PutDirRequest {
-        RootDirectory = rootDirectory,
+      var body = new PutDirRequest {
+        Directory = directory,
         Path = path,
         Recursive = recursive,
         Format = format
@@ -393,8 +415,7 @@ public class BlockTools {
 
   [McpServerTool(Name = "tia_plc_blocks_put_file_list"), Description(
     "Imports several PLC blocks from files, exactly like tia_plc_blocks_put_file for each entry in items, in a single TIA session. " +
-    "Each entry has BlockName and optional Path, Format and BlockNumber with the same meaning as in tia_plc_blocks_put_file " +
-    "(files are read from <rootDirectory>\\<project name>\\<Path or current folder of the block>\\). " +
+    "Each entry has Directory (absolute filesystem folder), BlockName and optional Path, Format and BlockNumber with the same meaning as in tia_plc_blocks_put_file. " +
     "The library options apply to every instance of a library type in the list; without libraryMode such blocks fail with StatusCode 409. " +
     LibraryWriteDescription +
     "Blocks whose import fails in TIA are retried after the others, so the order of the entries does not matter for dependencies. " +
@@ -406,8 +427,7 @@ public class BlockTools {
     [Description("The name of the project")] string projectName,
     [Description("PLC station / device name (DeviceName from tia_plc_devices_list)")] string deviceName,
     [Description("CPU / device item name (DeviceItemName from tia_plc_devices_list)")] string deviceItemName,
-    [Description("Absolute filesystem path on the TIA Portal/REST machine used as import base, e.g. \"C:\\\\TiaFiles\"; files under <rootDirectory>\\<project name>\\<TIA folder path>")] string rootDirectory,
-    [Description("Blocks to import: BlockName (required), Path (optional TIA folder names, not filesystem; selects subdirectory under rootDirectory and TIA target folder), Format (optional), BlockNumber (optional)")] PutFileListItem[] items,
+    [Description("Blocks to import: Directory (absolute filesystem folder, required), BlockName (required), Path (optional TIA folder), Format (optional), BlockNumber (optional)")] PutFileListItem[] items,
     [Description("Only for instances of library types: \"InTest\" or \"Release\"; omit for normal blocks")] string? libraryMode = null,
     [Description("Only with libraryMode \"Release\": version number to release, e.g. \"0.1.37\"")] string? libraryVersion = null,
     [Description("Only with libraryMode \"Release\": author of the released versions")] string? libraryAuthor = null,
@@ -420,7 +440,6 @@ public class BlockTools {
       string route = $"{BlockRoutes.PutFileList}?processId={processId}&projectName={Uri.EscapeDataString(projectName)}&deviceName={Uri.EscapeDataString(deviceName)}&deviceItemName={Uri.EscapeDataString(deviceItemName)}";
 
       var body = new PutFileListRequest {
-        RootDirectory = rootDirectory,
         Items = items.ToList(),
         LibraryMode = libraryMode,
         LibraryVersion = libraryVersion,

@@ -1,4 +1,8 @@
+#pragma warning disable MCPEXP002
+
 using System.Net;
+using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 using Tophinke.TiaOpenness.Tool.Consts;
 using Tophinke.TiaOpenness.Tool.TiaMCP;
 
@@ -20,8 +24,45 @@ string restPath = TiaRestManager.ResolveRestExePath(settings.RestPath);
 // REST-Client initialisieren
 TiaRestClient.Initialize(apiKey, settings.RestHost, settings.RestPort, settings.RestTimeoutSeconds, settings.LongRunningTimeoutMinutes);
 
+SkillCatalog skillCatalog;
+try {
+  skillCatalog = SkillCatalog.Load(Path.Combine(AppContext.BaseDirectory, "skills"));
+} catch (Exception ex) {
+  Console.Error.WriteLine($"Error loading MCP skills: {ex.Message}");
+  return 1;
+}
+builder.Services.AddSingleton(skillCatalog);
+
 // MCP Server registrieren und Tools laden
-builder.Services.AddMcpServer()
+builder.Services.AddMcpServer(options => {
+    options.Capabilities ??= new ServerCapabilities();
+    options.Capabilities.Resources ??= new ResourcesCapability();
+    options.Capabilities.Extensions = new Dictionary<string, object> {
+      ["io.modelcontextprotocol/skills"] = new Dictionary<string, object>()
+    };
+    options.RequestHandlers = SkillsHandlers.Create(skillCatalog);
+
+    options.ResourceCollection ??= new McpServerResourceCollection();
+    foreach (var file in skillCatalog.AllFiles) {
+      var captured = file;
+      options.ResourceCollection.Add(McpServerResource.Create(
+        () => captured.Text,
+        new McpServerResourceCreateOptions {
+          UriTemplate = captured.Uri,
+          Name = captured.Uri.Split('/').Last(),
+          Description = $"Skill file {captured.Uri}",
+          MimeType = captured.MimeType
+        }));
+    }
+
+    if (skillCatalog.Entries.Count > 0) {
+      var uris = string.Join(", ", skillCatalog.Entries.Select(e => e.Uri));
+      options.ServerInstructions =
+        "Agent Skills are available via the io.modelcontextprotocol/skills extension " +
+        $"(skills/list, skills/get) and as resources under skill://. Served skills: {uris}. " +
+        "Use skill-download to write all skills as a ZIP to an absolute directory on this machine.";
+    }
+  })
   .WithHttpTransport()
   .WithToolsFromAssembly(); // Lädt automatisch McpServerToolType-Klasse
 

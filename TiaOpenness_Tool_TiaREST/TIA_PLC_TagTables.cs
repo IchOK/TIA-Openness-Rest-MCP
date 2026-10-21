@@ -142,6 +142,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
             TagTableName = tagTable.Name,
             IsDefault = tagTable.IsDefault,
             Path = GetTagTablePath(tagTable),
+            ModifiedDate = cTiaExportHelpers.TryGetUtcAttribute(tagTable, "ModifiedTimeStamp"),
             Tags = tags,
             UserConstants = userConstants,
             SystemConstants = systemConstants
@@ -262,6 +263,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
             PlcName = plcSoftware.Name,
             TagTableName = tagTable.Name,
             Path = GetTagTablePath(tagTable),
+            ModifiedDate = cTiaExportHelpers.TryGetUtcAttribute(tagTable, "ModifiedTimeStamp"),
             Created = created,
             Changes = changes,
             Messages = messages.ToArray()
@@ -400,64 +402,73 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     }
 
     /// <summary>
-    /// Exportiert eine Tagtabelle als SimaticML-XML nach Root\Projekt\Ordnerpfad\&lt;Name&gt;.xml.
+    /// Exportiert eine Tagtabelle als SimaticML-XML in das angegebene Dateisystem-Verzeichnis (HTTP POST).
+    /// Alle Parameter liegen im JSON-Body; die URL enthält nur den Routenpfad.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
-    /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="tagTableName">Name der Tagtabelle</query>
-    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
-    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
-    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
+    /// <body name="ProcessId" type="number">Prozess-ID des TIA-Projekts</body>
+    /// <body name="ProjectName">Name des TIA-Projekts</body>
+    /// <body name="DeviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</body>
+    /// <body name="DeviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</body>
+    /// <body name="Directory">Absolutes Dateisystem-Verzeichnis; Datei wird direkt dort geschrieben</body>
+    /// <body name="TagTableName">Name der Tagtabelle</body>
+    /// <body name="Path" type="string[]">Optional: TIA-Ordner (Array); ohne Angabe wird der ganze PLC durchsucht</body>
     /// <returns>JSON-String mit FileData oder Fehlermeldung</returns>
-    [RestRoute(TagTableRoutes.GetFile)]
+    [RestRoute(TagTableRoutes.GetFile, "POST")]
     static public string GetFile(HttpListenerContext context) {
-      string processIdStr = context.Request.QueryString["processId"];
-      string projectName = context.Request.QueryString["projectName"];
-      string tagTableName = context.Request.QueryString["tagTableName"];
-      string deviceName = context.Request.QueryString["deviceName"];
-      string deviceItemName = context.Request.QueryString["deviceItemName"];
-      string rootError = cTiaExportHelpers.ResolveRootDirectory(context.Request.QueryString["rootDirectory"], out string fullRoot);
-      if (rootError != null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
+      GetFileRequest request;
+      try {
+        request = ReadBody<GetFileRequest>(context);
+      } catch (Exception ex) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Invalid request body: {ex.Message}");
+      }
+      string targetError = cTiaFileBatchHelpers.ValidatePlcTarget(request, out string processIdStr, out string projectName, out string deviceName, out string deviceItemName);
+      if (targetError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, targetError);
+      }
+      if (string.IsNullOrWhiteSpace(request.TagTableName)) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: TagTableName must be provided.");
+      }
+      if (request.Path != null && request.Path.Any(string.IsNullOrWhiteSpace)) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Path must not contain empty folder names.");
+      }
+      string dirError = cTiaExportHelpers.ResolveDirectory(request.Directory, out string directory);
+      if (dirError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, dirError);
       }
 
+      string tagTableName = request.TagTableName.Trim();
+      string[] tiaPath = request.Path;
       return cTiaFileBatchHelpers.ExecuteItem(context, processIdStr, projectName, project => {
         var errorMessage = cTiaProject.GetPlcTagTableGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup);
         if (errorMessage != null) {
           return ItemResult<FileData>.Fail(HttpStatusCode.NotFound, errorMessage);
         }
-        return ExportTagTableFile(project, plcSoftware, plcTagTableGroup, deviceName, deviceItemName, tagTableName, fullRoot);
+        return ExportTagTableFile(plcSoftware, plcTagTableGroup, deviceName, deviceItemName, tagTableName, directory, tiaPath);
       });
     }
 
     /// <summary>
-    /// Exportiert alle Tagtabellen eines Tagtabellen-Ordners als XML-Dateien (wie GetFile für jede Tabelle).
+    /// Exportiert alle Tagtabellen eines TIA-Tagtabellen-Ordners als XML-Dateien (HTTP POST).
+    /// Unterordner im TIA-Pfad relativ zu path werden als Unterverzeichnisse unter directory angelegt.
+    /// Alle Parameter liegen im JSON-Body; die URL enthält nur den Routenpfad.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
-    /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
-    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
-    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
-    /// <query name="path">Start-Ordner in der TIA-Tagtabellen-Struktur (nicht Dateisystem): ein Parameter je Ordnername; ohne Angabe der Tagtabellen-Wurzel; Dateien unter &lt;rootDirectory&gt;\&lt;Projekt&gt;\&lt;dieser Ordner&gt;</query>
-    /// <query name="recursive">Unterordner einbeziehen (Standard: true)</query>
+    /// <body name="ProcessId" type="number">Prozess-ID des TIA-Projekts</body>
+    /// <body name="ProjectName">Name des TIA-Projekts</body>
+    /// <body name="DeviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</body>
+    /// <body name="DeviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</body>
+    /// <body name="Directory">Absolutes Dateisystem-Verzeichnis, das dem TIA-Ordner Path entspricht</body>
+    /// <body name="Path" type="string[]">Optional: TIA-Startordner (Array); ohne Angabe der Tagtabellen-Wurzel</body>
+    /// <body name="Recursive" type="boolean">Unterordner einbeziehen (Standard: true)</body>
     /// <returns>JSON-String mit FileBatchResult von FileData oder Fehlermeldung</returns>
-    [RestRoute(TagTableRoutes.GetDir)]
+    [RestRoute(TagTableRoutes.GetDir, "POST")]
     static public string GetDir(HttpListenerContext context) {
-      string processIdStr = context.Request.QueryString["processId"];
-      string projectName = context.Request.QueryString["projectName"];
-      string deviceName = context.Request.QueryString["deviceName"];
-      string deviceItemName = context.Request.QueryString["deviceItemName"];
-      string[] folderPath = ReadPathFilter(context);
-      bool recursive = cTiaFileBatchHelpers.ReadRecursive(context, out string recursiveError);
-      if (recursiveError != null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, recursiveError);
+      string requestError = cTiaFileBatchHelpers.ReadGetDirRequest(context, out GetDirRequest request, out string processIdStr, out string projectName, out string deviceName, out string deviceItemName, out string directory, out bool recursive);
+      if (requestError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, requestError);
       }
-      string rootError = cTiaExportHelpers.ResolveRootDirectory(context.Request.QueryString["rootDirectory"], out string fullRoot);
-      if (rootError != null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
-      }
+      string[] folderPath = request.Path;
 
       return cTiaFileBatchHelpers.ExecuteBatch(context, processIdStr, projectName, project => {
         var errorMessage = cTiaProject.GetPlcTagTableGroup(project, deviceName, deviceItemName, out PlcSoftware plcSoftware, out PlcTagTableGroup plcTagTableGroup);
@@ -470,42 +481,48 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         }
 
         var batch = cTiaFileBatchHelpers.NewBatch<FileData>(deviceName, deviceItemName, plcSoftware);
-        errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, project.Name, groupPath, out string directory);
-        if (errorMessage != null) {
-          return ItemResult<FileBatchResult<FileData>>.Fail(HttpStatusCode.BadRequest, errorMessage);
-        }
         batch.Directory = directory;
         foreach (PlcTagTable table in EnumerateTagTables(group, recursive)) {
-          cTiaFileBatchHelpers.Collect(batch, ExportTagTableFile(project, plcSoftware, table, deviceName, deviceItemName, fullRoot), table.Name, GetTagTablePath(table));
+          string[] relative = cTiaExportHelpers.SkipPrefix(GetTagTablePath(table), groupPath);
+          errorMessage = cTiaExportHelpers.CombineDirectory(directory, relative, out string tableDir);
+          if (errorMessage != null) {
+            batch.Errors.Add(new FileBatchError { Name = table.Name, Path = GetTagTablePath(table), StatusCode = (int)HttpStatusCode.BadRequest, Error = errorMessage });
+            continue;
+          }
+          cTiaFileBatchHelpers.Collect(batch, ExportTagTableFile(plcSoftware, table, deviceName, deviceItemName, tableDir), table.Name, GetTagTablePath(table));
         }
         return ItemResult<FileBatchResult<FileData>>.Ok(batch);
       });
     }
 
     /// <summary>
-    /// Exportiert mehrere Tagtabellen als XML-Dateien (wie GetFile für jede Tabelle).
+    /// Exportiert mehrere Tagtabellen als XML-Dateien (wie GetFile für jeden Eintrag) (HTTP POST).
+    /// Alle Parameter liegen im JSON-Body; die URL enthält nur den Routenpfad.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
-    /// <query name="processId">Prozess-ID des TIA-Projekts</query>
-    /// <query name="projectName">Name des TIA-Projekts</query>
-    /// <query name="tagTableName">Namen der Tagtabellen, ein Parameter je Tabelle (tagTableName=A&amp;tagTableName=B)</query>
-    /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
-    /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
-    /// <query name="rootDirectory">Absoluter Dateisystem-Pfad auf dem Rechner mit TIA Portal/REST als Basis für Export/Import; Dateien unter &lt;rootDirectory&gt;\&lt;Projektname&gt;\&lt;Ordnerpfad&gt;</query>
+    /// <body name="ProcessId" type="number">Prozess-ID des TIA-Projekts</body>
+    /// <body name="ProjectName">Name des TIA-Projekts</body>
+    /// <body name="DeviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</body>
+    /// <body name="DeviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</body>
+    /// <body name="Items" type="json">Array von Objekten: Directory, TagTableName, optional Path</body>
     /// <returns>JSON-String mit FileBatchResult von FileData oder Fehlermeldung</returns>
-    [RestRoute(TagTableRoutes.GetFileList)]
+    [RestRoute(TagTableRoutes.GetFileList, "POST")]
     static public string GetFileList(HttpListenerContext context) {
-      string processIdStr = context.Request.QueryString["processId"];
-      string projectName = context.Request.QueryString["projectName"];
-      string deviceName = context.Request.QueryString["deviceName"];
-      string deviceItemName = context.Request.QueryString["deviceItemName"];
-      string[] tagTableNames = cTiaFileBatchHelpers.ReadNameList(context, "tagTableName");
-      if (tagTableNames == null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: At least one tagTableName must be provided (one parameter per tag table).");
+      GetFileListRequest<PutFileListItem> request;
+      try {
+        request = ReadBody<GetFileListRequest<PutFileListItem>>(context);
+      } catch (Exception ex) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Invalid request body: {ex.Message}");
       }
-      string rootError = cTiaExportHelpers.ResolveRootDirectory(context.Request.QueryString["rootDirectory"], out string fullRoot);
-      if (rootError != null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
+      string targetError = cTiaFileBatchHelpers.ValidatePlcTarget(request, out string processIdStr, out string projectName, out string deviceName, out string deviceItemName);
+      if (targetError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, targetError);
+      }
+      if (request.Items == null || request.Items.Count == 0) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Request body must contain at least one entry in Items.");
+      }
+      if (request.Items.Any(i => i == null || string.IsNullOrWhiteSpace(i.TagTableName) || string.IsNullOrWhiteSpace(i.Directory))) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Every entry in Items needs Directory and TagTableName.");
       }
 
       return cTiaFileBatchHelpers.ExecuteBatch(context, processIdStr, projectName, project => {
@@ -514,17 +531,21 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
           return ItemResult<FileBatchResult<FileData>>.Fail(HttpStatusCode.NotFound, errorMessage);
         }
         var batch = cTiaFileBatchHelpers.NewBatch<FileData>(deviceName, deviceItemName, plcSoftware);
-        foreach (string tagTableName in tagTableNames) {
-          cTiaFileBatchHelpers.Collect(batch, ExportTagTableFile(project, plcSoftware, plcTagTableGroup, deviceName, deviceItemName, tagTableName, fullRoot), tagTableName, null);
+        foreach (PutFileListItem item in request.Items) {
+          string dirError = cTiaExportHelpers.ResolveDirectory(item.Directory, out string directory);
+          if (dirError != null) {
+            batch.Errors.Add(new FileBatchError { Name = item.TagTableName, Path = item.Path, StatusCode = (int)HttpStatusCode.BadRequest, Error = dirError });
+            continue;
+          }
+          cTiaFileBatchHelpers.Collect(batch, ExportTagTableFile(plcSoftware, plcTagTableGroup, deviceName, deviceItemName, item.TagTableName.Trim(), directory, item.Path), item.TagTableName, item.Path);
         }
         return ItemResult<FileBatchResult<FileData>>.Ok(batch);
       });
     }
 
     /// <summary>
-    /// Legt eine Tagtabelle aus Root\Projekt\Ordnerpfad\&lt;Name&gt;.xml neu an oder überschreibt eine bestehende Tabelle (HTTP PUT).
-    /// Ordnerpfad ist Path aus dem Request, sonst der bisherige Ordner der Tabelle bzw. der Wurzelordner.
-    /// Eine bestehende Tabelle bleibt in ihrem Ordner.
+    /// Legt eine Tagtabelle aus Directory\&lt;Name&gt;.xml neu an oder überschreibt eine bestehende Tabelle (HTTP PUT).
+    /// Path ist der TIA-Zielordner für neue Tabellen; eine bestehende Tabelle bleibt in ihrem Ordner.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
@@ -532,7 +553,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="tagTableName">Name der Tagtabelle</query>
     /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
     /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
-    /// <body>PutFileRequest mit RootDirectory und optional Path</body>
+    /// <body name="Directory">Absolutes Dateisystem-Verzeichnis mit der XML-Datei</body>
+    /// <body name="Path" type="string[]">Optional: TIA-Ordner für neue Tabellen (Array)</body>
     /// <returns>JSON-String mit PutFileResult oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.PutFile, "PUT")]
     static public string PutFile(HttpListenerContext context) {
@@ -553,14 +575,14 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Invalid request body: {ex.Message}");
       }
       if (request == null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Request body must contain RootDirectory.");
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Request body must contain Directory.");
       }
       if (request.Path != null && request.Path.Any(string.IsNullOrWhiteSpace)) {
         return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Path must not contain empty folder names.");
       }
-      string rootError = cTiaExportHelpers.ResolveRootDirectory(request.RootDirectory, out string fullRoot);
-      if (rootError != null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
+      string dirError = cTiaExportHelpers.ResolveDirectory(request.Directory, out string directory);
+      if (dirError != null) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, dirError);
       }
 
       return cTiaFileBatchHelpers.ExecuteItem(context, processIdStr, projectName, project => {
@@ -568,20 +590,23 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         if (errorMessage != null) {
           return ItemResult<PutFileResult>.Fail(HttpStatusCode.NotFound, errorMessage);
         }
-        return ImportTagTableFile(project, plcSoftware, plcTagTableGroup, deviceName, deviceItemName, tagTableName, request.Path, fullRoot);
+        return ImportTagTableFile(plcSoftware, plcTagTableGroup, deviceName, deviceItemName, tagTableName, request.Path, directory);
       });
     }
 
     /// <summary>
-    /// Importiert alle Tagtabellen-Dateien (&lt;Name&gt;.xml) aus Root\Projekt\Ordnerpfad (optional mit Unterverzeichnissen) (HTTP PUT).
-    /// Jede Datei wird wie bei PutFile mit Path = Verzeichnispfad importiert; Dateien von Bausteinen und Datentypen werden übersprungen.
+    /// Importiert alle Tagtabellen-Dateien (&lt;Name&gt;.xml) aus einem Dateisystem-Verzeichnis (optional mit Unterverzeichnissen) (HTTP PUT).
+    /// Directory entspricht dem TIA-Ordner Path; Unterverzeichnisse werden an Path angehängt.
+    /// Jede Datei wird wie bei PutFile importiert; Dateien von Bausteinen und Datentypen werden übersprungen.
     /// </summary>
     /// <param name="context">HTTP-Anfrage-Kontext</param>
     /// <query name="processId">Prozess-ID des TIA-Projekts</query>
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
     /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
-    /// <body>PutDirRequest mit RootDirectory, optional Path und Recursive</body>
+    /// <body name="Directory">Absolutes Dateisystem-Verzeichnis, das dem TIA-Ordner Path entspricht</body>
+    /// <body name="Path" type="string[]">Optional: TIA-Zielordner (Array); ohne Angabe die Tagtabellen-Wurzel</body>
+    /// <body name="Recursive" type="boolean">Unterverzeichnisse einbeziehen (Standard: true)</body>
     /// <returns>JSON-String mit FileBatchResult von PutFileResult oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.PutDir, "PUT")]
     static public string PutDir(HttpListenerContext context) {
@@ -590,7 +615,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
       string deviceName = context.Request.QueryString["deviceName"];
       string deviceItemName = context.Request.QueryString["deviceItemName"];
 
-      string requestError = cTiaBlocks.ReadPutDirRequest(context, out PutDirRequest request, out string fullRoot, out _);
+      string requestError = cTiaBlocks.ReadPutDirRequest(context, out PutDirRequest request, out string directory, out _);
       if (requestError != null) {
         return requestError;
       }
@@ -601,12 +626,12 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
           return ItemResult<FileBatchResult<PutFileResult>>.Fail(HttpStatusCode.NotFound, errorMessage);
         }
         var batch = cTiaFileBatchHelpers.NewBatch<PutFileResult>(deviceName, deviceItemName, plcSoftware);
-        var scan = cTiaFileBatchHelpers.ScanDirectory(fullRoot, project.Name, request.Path, request.Recursive ?? true, cTiaFileBatchHelpers.KindTagTable, FormatXml, batch);
+        var scan = cTiaFileBatchHelpers.ScanDirectory(directory, request.Path, request.Recursive ?? true, cTiaFileBatchHelpers.KindTagTable, FormatXml, batch);
         if (scan.Failed) {
           return ItemResult<FileBatchResult<PutFileResult>>.Fail(scan.Status, scan.Error);
         }
         cTiaFileBatchHelpers.ImportAll(batch, scan.Value,
-          entry => ImportTagTableFile(project, plcSoftware, plcTagTableGroup, deviceName, deviceItemName, entry.Name, entry.Path, fullRoot),
+          entry => ImportTagTableFile(plcSoftware, plcTagTableGroup, deviceName, deviceItemName, entry.Name, entry.Path, entry.Directory),
           entry => entry.Name, entry => entry.Path);
         return ItemResult<FileBatchResult<PutFileResult>>.Ok(batch);
       });
@@ -620,7 +645,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     /// <query name="projectName">Name des TIA-Projekts</query>
     /// <query name="deviceName">Name der PLC-Station (DeviceName aus /api/plc/devices/list)</query>
     /// <query name="deviceItemName">Name der CPU/des Geräteelements (DeviceItemName aus /api/plc/devices/list)</query>
-    /// <body>PutFileListRequest mit RootDirectory und Items</body>
+    /// <body name="Items" type="json">Array von Objekten: Directory, TagTableName, optional Path</body>
     /// <returns>JSON-String mit FileBatchResult von PutFileResult oder Fehlermeldung</returns>
     [RestRoute(TagTableRoutes.PutFileList, "PUT")]
     static public string PutFileList(HttpListenerContext context) {
@@ -636,17 +661,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         return ErrorResponse(context, HttpStatusCode.BadRequest, $"Error: Invalid request body: {ex.Message}");
       }
       if (request?.Items == null || request.Items.Count == 0) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Request body must contain RootDirectory and at least one entry in Items.");
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Request body must contain at least one entry in Items.");
       }
-      if (request.Items.Any(i => i == null || string.IsNullOrWhiteSpace(i.TagTableName))) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Every entry in Items needs a TagTableName.");
+      if (request.Items.Any(i => i == null || string.IsNullOrWhiteSpace(i.TagTableName) || string.IsNullOrWhiteSpace(i.Directory))) {
+        return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Every entry in Items needs Directory and TagTableName.");
       }
       if (request.Items.Any(i => i.Path != null && i.Path.Any(string.IsNullOrWhiteSpace))) {
         return ErrorResponse(context, HttpStatusCode.BadRequest, "Error: Path must not contain empty folder names.");
-      }
-      string rootError = cTiaExportHelpers.ResolveRootDirectory(request.RootDirectory, out string fullRoot);
-      if (rootError != null) {
-        return ErrorResponse(context, HttpStatusCode.BadRequest, rootError);
       }
 
       return cTiaFileBatchHelpers.ExecuteBatch(context, processIdStr, projectName, project => {
@@ -656,7 +677,13 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         }
         var batch = cTiaFileBatchHelpers.NewBatch<PutFileResult>(deviceName, deviceItemName, plcSoftware);
         cTiaFileBatchHelpers.ImportAll(batch, request.Items,
-          item => ImportTagTableFile(project, plcSoftware, plcTagTableGroup, deviceName, deviceItemName, item.TagTableName.Trim(), item.Path, fullRoot),
+          item => {
+            string dirError = cTiaExportHelpers.ResolveDirectory(item.Directory, out string directory);
+            if (dirError != null) {
+              return ItemResult<PutFileResult>.Fail(HttpStatusCode.BadRequest, dirError);
+            }
+            return ImportTagTableFile(plcSoftware, plcTagTableGroup, deviceName, deviceItemName, item.TagTableName.Trim(), item.Path, directory);
+          },
           item => item.TagTableName, item => item.Path);
         return ItemResult<FileBatchResult<PutFileResult>>.Ok(batch);
       });
@@ -665,25 +692,29 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     #region Hilfsmethoden für TIA Openness Objektstruktur
 
     /// <summary>
-    /// Exportiert eine Tagtabelle (gesucht über den Namen) als XML-Datei unter Root\Projekt\Ordnerpfad der Tabelle.
+    /// Exportiert eine Tagtabelle (gesucht über den Namen, optional in einem TIA-Ordner) in das angegebene Dateisystem-Verzeichnis.
     /// </summary>
-    static private ItemResult<FileData> ExportTagTableFile(ProjectBase project, PlcSoftware plcSoftware, PlcTagTableGroup plcTagTableGroup, string deviceName, string deviceItemName, string tagTableName, string fullRoot) {
-      PlcTagTable table = cTiaFindHelpers.FindTagTable(plcTagTableGroup, tagTableName);
-      if (table == null) {
-        return ItemResult<FileData>.Fail(HttpStatusCode.NotFound, $"Error: Tag table with name {tagTableName} not found in PLC software {plcSoftware.Name}.");
+    static private ItemResult<FileData> ExportTagTableFile(PlcSoftware plcSoftware, PlcTagTableGroup plcTagTableGroup, string deviceName, string deviceItemName, string tagTableName, string directory, string[] tiaPath) {
+      PlcTagTableGroup searchGroup = plcTagTableGroup;
+      if (tiaPath != null && tiaPath.Length > 0) {
+        searchGroup = ResolveGroup<PlcTagTableGroup>(plcTagTableGroup, tiaPath, g => g.Groups, g => g.Name, out _);
+        if (searchGroup == null) {
+          return ItemResult<FileData>.Fail(HttpStatusCode.NotFound, $"Error: Tag table folder '{string.Join("/", tiaPath)}' not found in PLC software {plcSoftware.Name}.");
+        }
       }
-      return ExportTagTableFile(project, plcSoftware, table, deviceName, deviceItemName, fullRoot);
+      PlcTagTable table = cTiaFindHelpers.FindTagTable(searchGroup, tagTableName);
+      if (table == null) {
+        string where = tiaPath != null && tiaPath.Length > 0 ? $" in folder '{string.Join("/", tiaPath)}'" : "";
+        return ItemResult<FileData>.Fail(HttpStatusCode.NotFound, $"Error: Tag table with name {tagTableName} not found{where} in PLC software {plcSoftware.Name}.");
+      }
+      return ExportTagTableFile(plcSoftware, table, deviceName, deviceItemName, directory);
     }
 
     /// <summary>
-    /// Exportiert eine Tagtabelle als XML-Datei &lt;Name&gt;.xml unter Root\Projekt\Ordnerpfad der Tabelle; eine vorhandene Datei wird ersetzt.
+    /// Exportiert eine Tagtabelle als XML-Datei &lt;Name&gt;.xml in das angegebene Dateisystem-Verzeichnis; eine vorhandene Datei wird ersetzt.
     /// </summary>
-    static private ItemResult<FileData> ExportTagTableFile(ProjectBase project, PlcSoftware plcSoftware, PlcTagTable table, string deviceName, string deviceItemName, string fullRoot) {
+    static private ItemResult<FileData> ExportTagTableFile(PlcSoftware plcSoftware, PlcTagTable table, string deviceName, string deviceItemName, string directory) {
       string[] tablePath = GetTagTablePath(table);
-      string errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, project.Name, tablePath, out string directory);
-      if (errorMessage != null) {
-        return ItemResult<FileData>.Fail(HttpStatusCode.BadRequest, errorMessage);
-      }
 
       string file = Path.Combine(directory, cTiaExportHelpers.SanitizeFileName(table.Name) + ".xml");
       try {
@@ -706,6 +737,7 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         TagTableName = table.Name,
         IsDefault = table.IsDefault,
         Path = tablePath,
+        ModifiedDate = cTiaExportHelpers.TryGetUtcAttribute(table, "ModifiedTimeStamp"),
         Format = FormatXml,
         Directory = directory,
         Files = new[] { file }
@@ -713,23 +745,22 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
     }
 
     /// <summary>
-    /// Importiert eine Tagtabelle aus Root\Projekt\Ordnerpfad\&lt;Name&gt;.xml.
+    /// Importiert eine Tagtabelle aus Directory\&lt;Name&gt;.xml.
     /// Eine bestehende Tabelle wird in ihrem Ordner überschrieben; eine neue wird im Ordner Path angelegt.
     /// </summary>
-    /// <param name="requestPath">Dateiordner und Zielordner für neue Tabellen; null = bisheriger Ordner bzw. Wurzelordner</param>
-    static private ItemResult<PutFileResult> ImportTagTableFile(ProjectBase project, PlcSoftware plcSoftware, PlcTagTableGroup plcTagTableGroup, string deviceName, string deviceItemName,
-      string tagTableName, string[] requestPath, string fullRoot) {
+    /// <param name="requestPath">TIA-Zielordner für neue Tabellen; null = bisheriger Ordner bzw. Wurzelordner</param>
+    static private ItemResult<PutFileResult> ImportTagTableFile(PlcSoftware plcSoftware, PlcTagTableGroup plcTagTableGroup, string deviceName, string deviceItemName,
+      string tagTableName, string[] requestPath, string directory) {
       PlcTagTable existing = cTiaFindHelpers.FindTagTable(plcTagTableGroup, tagTableName);
       string[] existingPath = existing != null ? GetTagTablePath(existing) : null;
-      string[] filePath = requestPath ?? existingPath ?? new string[0];
 
-      string errorMessage = cTiaExportHelpers.GetFileDirectory(fullRoot, project.Name, filePath, out string directory);
+      string errorMessage = cTiaExportHelpers.ResolveDirectory(directory, out string fullDirectory);
       if (errorMessage != null) {
         return ItemResult<PutFileResult>.Fail(HttpStatusCode.BadRequest, errorMessage);
       }
-      string file = Path.Combine(directory, cTiaExportHelpers.SanitizeFileName(tagTableName) + ".xml");
+      string file = Path.Combine(fullDirectory, cTiaExportHelpers.SanitizeFileName(tagTableName) + ".xml");
       if (!File.Exists(file)) {
-        return ItemResult<PutFileResult>.Fail(HttpStatusCode.NotFound, $"Error: Tag table file not found: {file} (expected in rootDirectory\\project\\folder path).");
+        return ItemResult<PutFileResult>.Fail(HttpStatusCode.NotFound, $"Error: Tag table file not found: {file}.");
       }
       string kind = cTiaFileBatchHelpers.DetectKind(file);
       if (kind != cTiaFileBatchHelpers.KindTagTable) {
@@ -770,10 +801,11 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         TagTableName = imported.Name,
         IsDefault = imported.IsDefault,
         Path = GetTagTablePath(imported),
+        ModifiedDate = cTiaExportHelpers.TryGetUtcAttribute(imported, "ModifiedTimeStamp"),
         Created = existing == null,
         Format = FormatXml,
         Messages = messages.ToArray(),
-        Directory = directory,
+        Directory = fullDirectory,
         Files = new[] { file }
       });
     }
@@ -819,7 +851,8 @@ namespace Tophinke.TiaOpenness.Tool.TiaREST.PLC {
         list.Add(new Info {
           TagTableName = table.Name,
           IsDefault = table.IsDefault,
-          Path = path
+          Path = path,
+          ModifiedDate = cTiaExportHelpers.TryGetUtcAttribute(table, "ModifiedTimeStamp")
         });
       }
       foreach (PlcTagTableUserGroup userGroup in group.Groups) {
