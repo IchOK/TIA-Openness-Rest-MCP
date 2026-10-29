@@ -170,17 +170,6 @@ public static class TiaRestClient {
     });
   }
 
-  /// <summary>
-  /// Successful tool result that did not come from the REST API (e.g. local file operations).
-  /// </summary>
-  public static CallToolResult FromSuccess(object data) {
-    return ToToolResult(new McpApiResponse {
-      StatusCode = (int)HttpStatusCode.OK,
-      IsSuccess = true,
-      Data = JsonSerializer.SerializeToElement(data)
-    });
-  }
-
   private static CallToolResult ToToolResult(McpApiResponse apiResponse) {
     return new CallToolResult {
       Content = [new TextContentBlock { Text = JsonSerializer.Serialize(apiResponse, _resultJsonOptions) }],

@@ -1,6 +1,7 @@
 #pragma warning disable MCPEXP002
 
 using System.Net;
+using System.Text.Json.Nodes;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 using Tophinke.TiaOpenness.Tool.Consts;
@@ -37,8 +38,10 @@ builder.Services.AddSingleton(skillCatalog);
 builder.Services.AddMcpServer(options => {
     options.Capabilities ??= new ServerCapabilities();
     options.Capabilities.Resources ??= new ResourcesCapability();
+    // Values must be JsonObject (not Dictionary<string,object>): the MCP source-generated
+    // serializer fails initialize with Ambiguous JsonTypeInfo matches otherwise.
     options.Capabilities.Extensions = new Dictionary<string, object> {
-      ["io.modelcontextprotocol/skills"] = new Dictionary<string, object>()
+      ["io.modelcontextprotocol/skills"] = new JsonObject()
     };
     options.RequestHandlers = SkillsHandlers.Create(skillCatalog);
 
@@ -59,8 +62,7 @@ builder.Services.AddMcpServer(options => {
       var uris = string.Join(", ", skillCatalog.Entries.Select(e => e.Uri));
       options.ServerInstructions =
         "Agent Skills are available via the io.modelcontextprotocol/skills extension " +
-        $"(skills/list, skills/get) and as resources under skill://. Served skills: {uris}. " +
-        "Use skill-download to write all skills as a ZIP to an absolute directory on this machine.";
+        $"(skills/list, skills/get) and as resources under skill://. Served skills: {uris}.";
     }
   })
   .WithHttpTransport()

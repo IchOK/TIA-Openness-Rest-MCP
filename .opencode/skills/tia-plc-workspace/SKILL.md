@@ -19,7 +19,7 @@ Read [mcp-tools.md](mcp-tools.md) only when a tool's parameters or result fields
 
 1. TIA Portal is running with the target project open (or open it with `tia_projects_open`).
 2. TiaOpenness REST + MCP are reachable (default MCP `http://localhost:6281/mcp`).
-3. Every file tool needs an **absolute** `directory` on the machine that runs TIA Portal and the REST API. The API writes/reads files **directly in that folder**. It never appends project or PLC names.
+3. Every file tool needs an **absolute** `directory` on the machine that runs TIA Portal and the REST API. The API writes/reads files **directly in that folder**. It never appends project, PLC, or kind (`Blocks` / `UDTs` / `TagTables`) names — the skill builds those.
 
 If any MCP call fails with connection errors, stop and tell the user to start TiaREST/TiaMCP. Do not invent TIA content.
 
@@ -46,31 +46,42 @@ REST/MCP PLC file tools take:
 
 ### Layout this skill uses
 
+Kinds live in **separate** trees under the PLC. TIA folders stay under the kind folder:
+
 ```
-<workspace>\<projectName>\<PlcName>\<TIA folder…>\<Name>.s7dcl
-<workspace>\<projectName>\<PlcName>\<TIA folder…>\<Name>.s7res   (optional)
-<workspace>\<projectName>\<PlcName>\<TIA folder…>\<Name>.xml     (STL/GRAPH or tag tables)
+<workspace>\<projectName>\<PlcName>\Blocks\<TIA folder…>\<Name>.s7dcl
+<workspace>\<projectName>\<PlcName>\Blocks\<TIA folder…>\<Name>.s7res   (optional)
+<workspace>\<projectName>\<PlcName>\Blocks\<TIA folder…>\<Name>.xml     (STL/GRAPH)
+<workspace>\<projectName>\<PlcName>\UDTs\<TIA folder…>\<Name>.s7dcl
+<workspace>\<projectName>\<PlcName>\UDTs\<TIA folder…>\<Name>.s7res     (optional)
+<workspace>\<projectName>\<PlcName>\TagTables\<TIA folder…>\<Name>.xml
 ```
+
+Objects at the PLC root (empty TIA `path`) sit directly in the kind folder, e.g. `…\Blocks\<Name>.s7dcl`.
 
 Build paths with `Safe(name)` = replace invalid filename characters with `_`.
 
 ```
-PlcRoot   = Join(workspace, Safe(projectName), Safe(plcName))
-PlcDir(p) = Join(PlcRoot, Safe(p[0]), Safe(p[1]), …)   // empty p → PlcRoot
+PlcRoot        = Join(workspace, Safe(projectName), Safe(plcName))
+BlocksRoot     = Join(PlcRoot, "Blocks")
+UdtsRoot       = Join(PlcRoot, "UDTs")
+TagTablesRoot  = Join(PlcRoot, "TagTables")
+KindRoot(kind) = BlocksRoot | UdtsRoot | TagTablesRoot
+KindDir(kind,p)= Join(KindRoot(kind), Safe(p[0]), Safe(p[1]), …)   // empty p → KindRoot
 ```
 
 | Call | `directory` | `path` |
 |---|---|---|
-| One object (`*_get_file` / `*_put_file`) | `PlcDir(object.Path)` | same TIA folder array |
-| File list item | `PlcDir(item.Path)` per item | per item |
-| Dir whole PLC | `PlcRoot` | omit |
-| Dir one TIA folder | `PlcDir(startPath)` | that start folder |
+| One object (`*_get_file` / `*_put_file`) | `KindDir(kind, object.Path)` | same TIA folder array |
+| File list item | `KindDir(kind, item.Path)` per item | per item |
+| Dir whole PLC (one kind) | `KindRoot` for that kind | omit |
+| Dir one TIA folder | `KindDir(kind, startPath)` | that start folder |
 
-Recursive Dir: TIA subfolders relative to `path` become **subdirectories of `directory`**. Example: `directory = …\PLC_LIB\TopCtrl_Func\Visu`, `path = ["TopCtrl_Func","Visu"]` writes `tvDummy.s7dcl` into Visu and `Panel\tvAreaIndex.s7dcl` under it — never `…\TopCtrl_V3_Eng\PLC_LIB\…` composed by the API.
+Recursive Dir: TIA subfolders relative to `path` become **subdirectories of `directory`**. Example: `directory = …\PLC_LIB\Blocks\TopCtrl_Func\Visu`, `path = ["TopCtrl_Func","Visu"]` writes `tvDummy.s7dcl` into Visu and `Panel\tvAreaIndex.s7dcl` under it — the API never inserts `Blocks`, project, or PLC names itself.
 
 - `plcName` comes from `tia_plc_devices_list` (`PlcName`), not `DeviceName`.
 - Several PLCs share one `workspace`, separated by `<PlcName>`.
-- Blocks, UDTs and tag tables of one PLC share the same tree; Put*Dir tools distinguish kinds by file content.
+- Never mix kinds in one folder: blocks only under `Blocks\`, UDTs under `UDTs\`, tag tables under `TagTables\`.
 - Know-how-protected objects are skipped on export and cannot be overwritten.
 
 Prefer **Dir** (`*_get_dir`, `*_put_dir`) or **FileList** over many single-file calls.
@@ -84,43 +95,44 @@ Export one FC at `TopCtrl_Func/Basis/tbDTLtoString`:
 ```
 tia_plc_blocks_get_file(
   …, blockName: "tbDTLtoString",
-  directory: "C:\\TiaWorkspace\\TopCtrl_V3_Eng\\PLC_LIB\\TopCtrl_Func\\Basis",
+  directory: "C:\\TiaWorkspace\\TopCtrl_V3_Eng\\PLC_LIB\\Blocks\\TopCtrl_Func\\Basis",
   path: ["TopCtrl_Func", "Basis"])
-→ Files: …\Basis\tbDTLtoString.s7dcl (+ .s7res)
+→ Files: …\Blocks\TopCtrl_Func\Basis\tbDTLtoString.s7dcl (+ .s7res)
 ```
 
 Export several into different folders (`*_get_file_list` / `*_put_file_list`):
 
 ```
 items: [
-  { directory: "…\\PLC_LIB\\TopCtrl_Func\\Basis", blockName: "tbDTLtoString", path: ["TopCtrl_Func","Basis"] },
-  { directory: "…\\PLC_LIB\\TopCtrl_Func\\Basis", blockName: "tbUDINTtoStringFormat", path: ["TopCtrl_Func","Basis"] }
+  { directory: "…\\PLC_LIB\\Blocks\\TopCtrl_Func\\Basis", blockName: "tbDTLtoString", path: ["TopCtrl_Func","Basis"] },
+  { directory: "…\\PLC_LIB\\Blocks\\TopCtrl_Func\\Basis", blockName: "tbUDINTtoStringFormat", path: ["TopCtrl_Func","Basis"] }
 ]
 ```
 
 Export/import a folder:
 
 ```
-tia_plc_blocks_get_dir(…, directory: "…\\PLC_LIB\\TopCtrl_Func\\Basis",
+tia_plc_blocks_get_dir(…, directory: "…\\PLC_LIB\\Blocks\\TopCtrl_Func\\Basis",
   path: ["TopCtrl_Func","Basis"], recursive: false)
 tia_plc_blocks_put_dir(…, directory: same, path: same, recursive: false)
 ```
 
-Derive `path` from a local file: relative folders under `PlcRoot`, split into a string array. File stem = `BlockName` / `UdtName` / `TagTableName`.
+Derive `path` from a local file: relative folders under the **kind root** (`Blocks` / `UDTs` / `TagTables`), split into a string array — do **not** include the kind folder itself. File stem = `BlockName` / `UdtName` / `TagTableName`.
 
 ## Git model
 
-The git repo lives at the chosen workspace root (typically `workspace`, which contains `<projectName>\<PlcName>\`).
+The git repo lives at the chosen workspace root (typically `workspace`, which contains `<projectName>\<PlcName>\Blocks|UDTs|TagTables\…`).
 
-- Tag or branch `tia/last-export` = last snapshot that came **from TIA**.
-- Working tree / commits after that = **local** edits.
-- Never `git commit` unless the user asked, except the **first** `git init` baseline of workflow 1, and a `tia/last-export` tag update after a successful export (lightweight, no extra commit required if you can `git tag -f tia/last-export`).
+- Tag `tia/last-export` = last committed workspace snapshot used to detect **file-side** edits (workflow 2).
+- TIA-side edits are detected via `.tia-workspace.json` element `modifiedDate` vs list-tool `ModifiedDate` — not via git.
+- Never `git commit` unless the user asked, except the **first** `git init` baseline of workflow 1, and an optional `tia/last-export` tag update after a successful sync/export.
 - After import, TIA often **re-formats** SD files. Round-trip is not byte-stable. Treat TIA export as canonical formatting.
 
 `.gitignore` in the workspace:
 
 ```
 .tia-workspace.json
+.tia-merge-tmp/
 *.log
 *.tmp
 ```
@@ -135,9 +147,9 @@ Keep `.s7dcl`, `.s7res`, `.xml` tracked.
 | List PLCs | `tia_plc_devices_list` |
 | Inventory + TIA timestamps | `tia_plc_blocks_list`, `tia_plc_udts_list`, `tia_plc_tagtables_list` (`ModifiedDate` UTC) |
 | Full/folder export | `tia_plc_udts_get_dir`, `tia_plc_tagtables_get_dir`, `tia_plc_blocks_get_dir` (`recursive` true) |
-| Selected export (TIA-newer) | `*_get_file_list` |
+| Selected export (sync TIA-only) | `*_get_file_list` |
 | Full/folder import | `tia_plc_udts_put_dir`, then `tia_plc_tagtables_put_dir`, then `tia_plc_blocks_put_dir` |
-| Selected import | `*_put_file` or `*_put_file_list` |
+| Selected import (sync file-only) | `*_put_file` or `*_put_file_list` |
 | Compile one FC/FB/OB/UDT | `tia_plc_compile_item` (`itemType` `"Block"` or `"UDT"`) |
 | Compile PLC software (changes) | `tia_plc_compile_plc` |
 | Save TIA | `tia_projects_save` |
@@ -148,16 +160,147 @@ Batch results: `IsSuccess` false with `StatusCode` 400 still has `Data.Succeeded
 
 ---
 
+## `.tia-workspace.json` (element catalog)
+
+Written at the git root (listed in `.gitignore`). Sync compares **per element**, not a single global timestamp.
+
+Each successfully exported element has one entry with the TIA `ModifiedDate` and the relative workspace files that belong to it:
+
+```json
+{
+  "workspace": "C:\\TiaWorkspace",
+  "projectName": "<Name>",
+  "plcs": [
+    {
+      "deviceName": "<DeviceName>",
+      "deviceItemName": "<DeviceItemName>",
+      "plcName": "<PlcName>",
+      "elements": [
+        {
+          "kind": "Block",
+          "name": "tbDTLtoString",
+          "path": ["TopCtrl_Func", "Basis"],
+          "modifiedDate": "2026-10-21T11:18:00.000Z",
+          "files": [
+            "TopCtrl_V3_Eng\\PLC_LIB\\Blocks\\TopCtrl_Func\\Basis\\tbDTLtoString.s7dcl",
+            "TopCtrl_V3_Eng\\PLC_LIB\\Blocks\\TopCtrl_Func\\Basis\\tbDTLtoString.s7res"
+          ]
+        },
+        {
+          "kind": "UDT",
+          "name": "typeExample",
+          "path": ["Types"],
+          "modifiedDate": "2026-10-20T09:00:00.000Z",
+          "files": [
+            "TopCtrl_V3_Eng\\PLC_LIB\\UDTs\\Types\\typeExample.s7dcl"
+          ]
+        },
+        {
+          "kind": "TagTable",
+          "name": "Default tag table",
+          "path": [],
+          "modifiedDate": "2026-10-19T15:30:00.000Z",
+          "files": [
+            "TopCtrl_V3_Eng\\PLC_LIB\\TagTables\\Default tag table.xml"
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `kind` | `"Block"`, `"UDT"`, or `"TagTable"` |
+| `name` | TIA object name (`BlockName` / `UdtName` / `TagTableName`) |
+| `path` | TIA folder array (empty = PLC root) |
+| `modifiedDate` | TIA `ModifiedDate` (UTC ISO-8601) at last successful sync/export of this element |
+| `files` | Paths relative to `workspace`, all siblings of that element (`.s7dcl` / `.s7res` / `.xml`) |
+
+Element identity for sync: `(plcName, kind, name, path)`. Know-how-skipped or failed exports get **no** entry (or keep a previous entry only if the local files still exist and the user wants them).
+
+Map a relative file to an element: under `<projectName>\<PlcName>\Blocks|UDTs|TagTables\`, kind = that folder, `path` = folders under the kind root, `name` = file stem. `.s7dcl` and `.s7res` with the same stem are one element.
+
+## Helper scripts (use these — do not hand-edit the catalog)
+
+Location: `scripts/` next to this skill (`update_catalog.py`, `compare_sync.py`, `apply_conflict_choices.py`, `merge_element.py`, `catalog_lib.py`). Stdlib only (+ `git` / optional `code` on PATH). Run with `python` or `python3` from any cwd; pass absolute paths.
+
+Save MCP tool results as JSON files first (full `McpApiResponse` or bare `Data` is fine).
+
+### Build / refresh catalog — `update_catalog.py`
+
+**Abbild** (rebuild all elements for one PLC from list tools + files on disk):
+
+```bash
+python scripts/update_catalog.py \
+  --catalog "<workspace>\\.tia-workspace.json" \
+  --workspace "<workspace>" --project "<projectName>" --plc "<PlcName>" \
+  --device-name "<DeviceName>" --device-item-name "<DeviceItemName>" \
+  --blocks-list blocks_list.json --udts-list udts_list.json --tagtables-list tagtables_list.json \
+  --replace-plc --scan-files
+```
+
+**After sync export/import** (update only transferred elements; prefer fresh list JSON + optional batch `Data`):
+
+```bash
+python scripts/update_catalog.py \
+  --catalog "<workspace>\\.tia-workspace.json" \
+  --workspace "<workspace>" --project "<projectName>" --plc "<PlcName>" \
+  --blocks-list blocks_list.json --udts-list udts_list.json --tagtables-list tagtables_list.json \
+  --touched synced.json --scan-files
+```
+
+Optional: `--batch-blocks` / `--batch-udts` / `--batch-tagtables` with get/put dir or file_list responses (uses `Items[].ModifiedDate` and `Items[].Files`).
+
+`synced.json` is a JSON array of `{"kind","name","path"}` (from `apply_conflict_choices.py` export/import outputs, or hand-built).
+
+### Sync comparison — `compare_sync.py`
+
+```bash
+python scripts/compare_sync.py \
+  --catalog "<workspace>\\.tia-workspace.json" --plc "<PlcName>" \
+  --blocks-list blocks_list.json --udts-list udts_list.json --tagtables-list tagtables_list.json \
+  --out-json sync_plan.json --out-plan-md sync_plan.md --print-md
+```
+
+Produces `tiaOnly` / `fileOnly` / `both` (conflicts) with catalog/TIA/file dates. Show the conflict table to the user; do not transfer conflicts until choices exist.
+
+### Apply conflict answers — `apply_conflict_choices.py`
+
+```bash
+python scripts/apply_conflict_choices.py \
+  --plan sync_plan.json --choices "1:TIA,2:Skip,3:File,4:Merge" \
+  --out-export export_touched.json --out-import import_touched.json \
+  --out-skip skip.json --out-merge merge_touched.json
+```
+
+Then export `export_touched.json`, import `import_touched.json`, run the Merge pipeline for `merge_touched.json`, and `update_catalog.py --touched` on successfully transferred elements (with fresh list JSON).
+
+### 3-way merge one file — `merge_element.py`
+
+```bash
+python scripts/merge_element.py \
+  --workspace "<workspace>" --git-ref tia/last-export \
+  --rel-file "<project>\\<Plc>\\Blocks\\...\\Name.s7dcl" \
+  --tia-temp-file "<workspace>\\.tia-merge-tmp\\...\\Name.s7dcl" \
+  --open-editor
+```
+
+Writes the merge result into the workspace file. Status JSON on stdout: `clean` | `conflicted` | `error`. With `--open-editor` and `conflicted`, starts **VS Code** (`code --merge base local other output`). OpenCode has no 3-way merge UI.
+
+---
+
 ## Workflow 1 — Projekt Abbilden
 
-Complete export into a local directory and a git repo for change detection.
+Complete export into a local directory, fill the element catalog, and create a git baseline.
 
 Checklist:
 
 - [ ] Bootstrap session
 - [ ] Choose one `workspace` for the project
-- [ ] Export UDTs, tag tables, blocks (per PLC; `directory` = `PlcRoot`)
-- [ ] Write `.tia-workspace.json` including `lastExportUtc`
+- [ ] Export UDTs, tag tables, blocks (per PLC; `directory` = kind root)
+- [ ] List TIA objects; write `.tia-workspace.json` with every element's `modifiedDate` + `files`
 - [ ] `git init` if needed, first commit, tag `tia/last-export`
 - [ ] Report skipped/failed objects
 
@@ -165,30 +308,15 @@ Steps:
 
 1. Create `workspace` if it does not exist.
 2. For each target PLC:
-   1. `tia_plc_udts_get_dir` with `directory` = `PlcRoot` (omit `path`, `recursive` true)
-   2. `tia_plc_tagtables_get_dir` with the same `directory`
-   3. `tia_plc_blocks_get_dir` with the same `directory`
+   1. `tia_plc_udts_get_dir` with `directory` = `UdtsRoot` (omit `path`, `recursive` true)
+   2. `tia_plc_tagtables_get_dir` with `directory` = `TagTablesRoot`
+   3. `tia_plc_blocks_get_dir` with `directory` = `BlocksRoot`
 3. Inspect `Data.Failed`, `Data.Errors`, `Data.Skipped` (know-how-protected, export-incapable languages, SimaticSdEnabler).
 4. Optionally `tia_plc_blocks_list_export_capabilities` if many blocks failed.
-5. Write `.tia-workspace.json`:
-
-```json
-{
-  "workspace": "C:\\TiaWorkspace",
-  "projectName": "<Name>",
-  "lastExportUtc": "2026-10-21T11:18:00.000Z",
-  "plcs": [
-    {
-      "deviceName": "<DeviceName>",
-      "deviceItemName": "<DeviceItemName>",
-      "plcName": "<PlcName>"
-    }
-  ]
-}
-```
-
-`lastExportUtc` is the latest `ModifiedDate` seen in the export (or the time of the export if none). Used by workflow 2.
-
+5. Build the element catalog with the helper script (do not assemble the JSON by hand):
+   1. Save `tia_plc_udts_list`, `tia_plc_tagtables_list`, `tia_plc_blocks_list` responses as JSON files.
+   2. Optionally save successful `*_get_dir` responses as `--batch-*` inputs.
+   3. Run `update_catalog.py --replace-plc --scan-files` (see Helper scripts).
 6. In the git root:
 
 ```bash
@@ -199,7 +327,7 @@ git commit -m "tia-export: baseline of <projectName>"
 git tag -f tia/last-export
 ```
 
-7. Summarize: PLC count, exported UDT/table/block counts, skipped know-how, failed exports, git root.
+7. Summarize: PLC count, exported UDT/table/block counts, catalog entry count, skipped know-how, failed exports, git root.
 
 Do not close the TIA project. Do not compile.
 
@@ -207,52 +335,62 @@ Do not close the TIA project. Do not compile.
 
 ## Workflow 2 — Projekt Sync
 
-Export newer TIA elements into the local tree; import locally changed elements into TIA.
+Reconcile TIA and the workspace **per element** using the catalog + git. Never run a blind full `*_get_dir` / `*_put_dir` for sync.
 
-TIA timestamps: `ModifiedDate` on list/get (UTC ISO-8601). Blocks/UDTs: Openness `ModifiedDate`. Tag tables: Openness `ModifiedTimeStamp`, exposed as `ModifiedDate`. **Never export first** — that would overwrite local edits.
+TIA timestamps: `ModifiedDate` on list tools (UTC ISO-8601). Blocks/UDTs: Openness `ModifiedDate`. Tag tables: Openness `ModifiedTimeStamp`, exposed as `ModifiedDate`.
 
 Checklist:
 
 - [ ] Bootstrap + read `.tia-workspace.json`
-- [ ] Capture local changes vs `tia/last-export`
-- [ ] List TIA objects; select those with `ModifiedDate` > `lastExportUtc`
-- [ ] Stash overlapping local files
-- [ ] Export only TIA-newer objects (`*_get_file_list`)
-- [ ] Restore local changes; report conflicts
-- [ ] Import only local-changed files
-- [ ] Optionally compile and save
-- [ ] Update `lastExportUtc` and `tia/last-export`
+- [ ] Save list-tool JSON; run `compare_sync.py` → `sync_plan.json` + conflict table
+- [ ] Present **conflict decision table**; wait for per-row choices (`TIA` / `File` / `Skip` / `Merge`)
+- [ ] `apply_conflict_choices.py` → export / import / skip / merge touched lists
+- [ ] Export / import as planned; Skip = no transfer; Merge = 3-way pipeline
+- [ ] Re-list TIA; `update_catalog.py --touched` for transferred elements
+- [ ] Optionally compile, save, update `tia/last-export`
 
 Steps:
 
-1. If no git repo or no tag `tia/last-export`, run workflow 1 first (or tag HEAD if the current tree is a known clean export).
-2. Local set:
+1. If no `.tia-workspace.json` with `elements`, or no git repo / tag `tia/last-export`, run workflow 1 first.
+2. Call `tia_plc_blocks_list`, `tia_plc_udts_list`, `tia_plc_tagtables_list`; save each response as JSON.
+3. Run `compare_sync.py` (see Helper scripts). It builds:
+   - **TIA-only** — catalog `modifiedDate` ≠ list `ModifiedDate` (or missing catalog entry), and not file-changed
+   - **File-only** — git changes under kind trees mapped to elements, and not TIA-changed
+   - **Both** — conflicts
+   - **Vanished** — in catalog but missing from TIA lists (report only; do not delete files unless asked)
+4. **Conflict decision table** — if `both` is non-empty, **stop transfers** and show the Markdown table from `compare_sync.py` (`--print-md` / `--out-plan-md`) so the user can walk every conflict. Do not start export/import/merge of conflicts until the user answered.
 
-```bash
-git status --porcelain
-git diff --name-only tia/last-export
-git ls-files --others --exclude-standard
-```
+Choice semantics:
 
-Relevant files: `.s7dcl`, `.s7res`, `.xml` under `<projectName>\<PlcName>\` in the workspace.
+| Choice | Meaning |
+|---|---|
+| `TIA` | Export from TIA into the workspace (overwrite local) |
+| `File` | Import local files into TIA |
+| `Skip` | Do not sync — leave TIA, files, and catalog unchanged |
+| `Merge` | 3-way merge: Base = `tia/last-export`, Local = workspace, Other = TIA temp export → then import merged result to TIA |
 
-3. TIA-newer set: `tia_plc_blocks_list`, `tia_plc_udts_list`, `tia_plc_tagtables_list`. Keep objects whose `ModifiedDate` is greater than `lastExportUtc`. If `lastExportUtc` is missing, treat all as newer (or run workflow 1).
-4. Conflicts = files that are both locally modified and TIA-newer. Do not overwrite them; list them and keep the local version unless the user says otherwise.
-5. If there are non-conflicting TIA-newer objects, `*_get_file_list` those objects (not a full `*_get_dir`, unless most of the PLC changed). Each item: `directory` = `PlcDir(Path)`, name, `path` = TIA folder array.
-6. Import **only** locally changed objects, in this order:
-   - UDTs → `tia_plc_udts_put_file_list` (or `put_file`)
-   - Tag tables → `tia_plc_tagtables_put_file_list`
-   - Blocks → `tia_plc_blocks_put_file_list`
-   Derive name from the file stem. Derive `path` from the relative folder under `PlcRoot`. Pass that absolute folder as `directory`. For library instances pass `libraryMode: "InTest"`.
-7. Do **not** blindly `*_put_dir` on the whole tree during sync; that would re-import TIA-unchanged files and can open library types for editing.
-8. If the user wants a consistency check: `tia_plc_compile_plc`, then report `State`, `ErrorCount`, `WarningCount`, and error `Messages`.
-9. Ask before `tia_projects_save`.
-10. After a successful TIA→local export:
-    - Set `lastExportUtc` to the latest `ModifiedDate` among listed objects (or the export time).
-    - Commit TIA-only updates if the user wants a commit.
-    - `git tag -f tia/last-export` only on a tree that matches TIA (no unresolved local diffs), **or** tag after committing the export and before re-applying local work.
+Collect answers as `1:TIA, 2:Skip, 3:File, 4:Merge`. Partial answers → ask again for remaining `?` (never treat blank as Skip). `compare_sync.py --out-plan-md` also lists planned TIA-only / File-only rows.
 
-Report three lists: imported local files, files updated from TIA, conflicts.
+5. Run `apply_conflict_choices.py --plan sync_plan.json --choices "…" --out-merge merge_touched.json`. If it exits with unresolved rows, stop and ask again.
+6. Export `export_touched.json` via `*_get_file_list` (`directory` = `KindDir(kind, Path)`). Import `import_touched.json` via put tools in order UDTs → tag tables → blocks (`libraryMode: "InTest"` when needed). Skip list: no transfer.
+7. **Merge pipeline** for each element in `merge_touched.json` (requires tag `tia/last-export` and a Base file in that commit; otherwise refuse Merge and ask for another choice):
+   1. Create `<workspace>\.tia-merge-tmp\<stamp>\` (gitignored).
+   2. Export the TIA object with `*_get_file` into the matching kind/path under that temp root (`directory` = temp `KindDir`).
+   3. For each relative file of the element (`.s7dcl` / `.s7res` / `.xml` separately): run `merge_element.py --workspace … --rel-file … --tia-temp-file … --open-editor`.
+   4. If status is `conflicted`: wait until the user finishes in **VS Code** (or resolves markers manually). If `code` is missing, tell the user to install VS Code (installer option) and stop that element.
+   5. When the workspace file is clean (no conflict markers): `*_put_file` / put list for that element (import merged Local → TIA).
+   6. Delete the temp tree when done (or leave it only if the user wants to inspect failures).
+   Tag-tables / STL XML often merge poorly — if `merge-file` produces nonsense, fall back to `TIA` / `File` / `Skip` after asking the user.
+8. Do **not** `*_put_dir` / `*_get_dir` the whole tree during sync.
+9. **Update the catalog** with `update_catalog.py` (not for Skip; include successful Merge imports):
+   1. Call list tools again; save JSON.
+   2. Build `synced.json` = successfully exported ∪ imported ∪ merged elements.
+   3. `update_catalog.py --touched synced.json --scan-files` (optional `--batch-*` from the transfer responses).
+10. If the user wants a consistency check: `tia_plc_compile_plc`, then report `State`, `ErrorCount`, `WarningCount`, and error `Messages`.
+11. Ask before `tia_projects_save`.
+12. After the sync transfers succeed, optionally commit and `git tag -f tia/last-export` when the working tree matches the intended baseline (user decides).
+
+Report: exported from TIA, imported to TIA, merged, skipped conflicts, remaining unanswered (should be none), catalog updates.
 
 ---
 
@@ -274,13 +412,13 @@ Checklist:
 1. Pick folder `path` (TIA groups) and a unique `BlockName`.
 2. Copy a **similar existing** FC/FB from the workspace as template (preferred over writing SD from scratch).
 3. Change the declaration name to `BlockName`. Keep `Format` SimaticData/SD (`.s7dcl`).
-4. Place files at `PlcDir(path)\<BlockName>.s7dcl`.
+4. Place files at `KindDir(Blocks, path)\<BlockName>.s7dcl`.
 5. If the template `.s7res` is copied, keep every `{ S7_MLC := "…" }` ID in sync. Adding a comment requires a new unique ID in both files.
-6. `tia_plc_blocks_put_file` with `directory` = `PlcDir(path)` and the same TIA `path`. For a new block TIA assigns a number unless `blockNumber` is set.
+6. `tia_plc_blocks_put_file` with `directory` = `KindDir(Blocks, path)` and the same TIA `path`. For a new block TIA assigns a number unless `blockNumber` is set.
 
 ### Edit
 
-1. If the file is missing locally, `tia_plc_blocks_get_file` with `directory` = `PlcDir(path)` and that TIA `path`.
+1. If the file is missing locally, `tia_plc_blocks_get_file` with `directory` = `KindDir(Blocks, path)` and that TIA `path`.
 2. Edit the local `.s7dcl`. Do not strip generated SD headers/attributes you do not understand.
 3. `tia_plc_blocks_put_file` with the same `directory` and `path`. Prefer non-library blocks, or pass `libraryMode: "InTest"`.
 
@@ -304,7 +442,7 @@ When `ErrorCount` is 0, summarize what changed and whether TIA still has unsaved
 
 | Symptom | Action |
 |---|---|
-| 400 missing `directory` | You forgot the absolute folder; build `PlcDir(path)` |
+| 400 missing `directory` | You forgot the absolute folder; build `KindDir(kind, path)` |
 | 409 library type | Retry with `libraryMode` `"InTest"`; do not `Release` unless the user asks |
 | Know-how-protected | Stop; cannot overwrite |
 | Missing `.s7res` IDs | Import rejected before TIA changes; fix IDs |
@@ -318,7 +456,7 @@ When `ErrorCount` is 0, summarize what changed and whether TIA still has unsaved
 ## Rules
 
 - Always pass `processId`, `projectName`, `deviceName`, `deviceItemName` from list tools. Do not guess names.
-- Always build `directory` yourself (`PlcRoot` / `PlcDir`). Never expect the API to add project or PLC folders.
+- Always build `directory` yourself (`KindRoot` / `KindDir` with `Blocks`, `UDTs`, or `TagTables`). Never expect the API to add project, PLC, or kind folders.
 - Prefer file tools over `tia_plc_blocks_get` / `put` (content in the prompt) except for tiny patches.
 - Do not delete local files that TIA skipped (know-how). Git should keep the last exported copy if it exists; do not treat skip as delete.
 - Do not move UDTs: existing UDTs stay in their TIA folder even if `path` differs.

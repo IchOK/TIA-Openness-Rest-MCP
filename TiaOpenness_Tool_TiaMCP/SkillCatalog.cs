@@ -1,4 +1,3 @@
-using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
@@ -72,47 +71,6 @@ public sealed class SkillCatalog {
     }
 
     return catalog;
-  }
-
-  /// <summary>
-  /// Writes a ZIP of all skills (paths as <c>{skillName}/…</c>, BOM-stripped UTF-8 content) into
-  /// <paramref name="directory"/>. Returns the absolute path of the created archive.
-  /// </summary>
-  public string WriteZip(string directory, string? fileName = null) {
-    if (string.IsNullOrWhiteSpace(directory)) {
-      throw new ArgumentException("directory is required.", nameof(directory));
-    }
-    if (!Path.IsPathRooted(directory)) {
-      throw new ArgumentException("directory must be an absolute path.", nameof(directory));
-    }
-
-    Directory.CreateDirectory(directory);
-    fileName = string.IsNullOrWhiteSpace(fileName) ? "tia-opencode-skills.zip" : fileName.Trim();
-    if (!fileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) {
-      fileName += ".zip";
-    }
-
-    var zipPath = Path.GetFullPath(Path.Combine(directory, fileName));
-    if (File.Exists(zipPath)) {
-      File.Delete(zipPath);
-    }
-
-    using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create)) {
-      foreach (var skill in Entries.OrderBy(e => e.Uri, StringComparer.Ordinal)) {
-        foreach (var file in skill.Files) {
-          // skill://name/rel → name/rel
-          var entryName = file.Uri.StartsWith("skill://", StringComparison.Ordinal)
-            ? file.Uri["skill://".Length..]
-            : file.Uri;
-          var entry = zip.CreateEntry(entryName, CompressionLevel.Optimal);
-          using var stream = entry.Open();
-          var bytes = Encoding.UTF8.GetBytes(file.Text);
-          stream.Write(bytes, 0, bytes.Length);
-        }
-      }
-    }
-
-    return zipPath;
   }
 
   private static JsonObject ParseFrontmatter(string markdown) {

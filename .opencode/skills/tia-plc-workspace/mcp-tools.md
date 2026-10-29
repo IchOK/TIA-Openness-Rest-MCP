@@ -32,13 +32,18 @@ Block list fields: `BlockName`, `BlockNumber`, `BlockType`, `ProgrammingLanguage
 
 UDT list fields include `UdtName`, `Path`, `ModifiedDate`. Tag table list fields include `TagTableName`, `IsDefault`, `Path`, `ModifiedDate` (from Openness `ModifiedTimeStamp`).
 
+Workflow sync: use skill `scripts/compare_sync.py` (list JSON + catalog + git), `apply_conflict_choices.py` (choices include `Merge`), `merge_element.py` (3-way: Base=`tia/last-export`, Local=workspace, Other=TIA temp; VS Code `code --merge` on conflicts), and `update_catalog.py` after transfers. Do not hand-merge ModifiedDate into `.tia-workspace.json`.
+
 ## Files — `directory` + `path` (no composition)
 
-PLC file tools write/read **directly in `directory`**. They never append `<projectName>\<PlcName>`. The skill builds that layout:
+PLC file tools write/read **directly in `directory`**. They never append `<projectName>\<PlcName>` or kind folders. The skill builds that layout:
 
 ```
-PlcRoot   = <workspace>\<projectName>\<PlcName>
-PlcDir(p) = PlcRoot\<TIA folder…>     // p empty → PlcRoot
+PlcRoot        = <workspace>\<projectName>\<PlcName>
+BlocksRoot     = PlcRoot\Blocks
+UdtsRoot       = PlcRoot\UDTs
+TagTablesRoot  = PlcRoot\TagTables
+KindDir(kind,p)= KindRoot\<TIA folder…>     // p empty → KindRoot
 ```
 
 **Export** (`*_get_file`, `*_get_dir`, `*_get_file_list`): REST **POST**, all fields in the JSON **body** (incl. `processId`, `projectName`, `deviceName`, `deviceItemName`, `directory`, …). URL is only the route path.
@@ -93,12 +98,13 @@ Library instances:
 Block `tbDTLtoString` at TIA path `["TopCtrl_Func","Basis"]`, workspace `C:\TiaWorkspace`, project `TopCtrl_V3_Eng`, PLC `PLC_LIB`:
 
 ```
-directory = C:\TiaWorkspace\TopCtrl_V3_Eng\PLC_LIB\TopCtrl_Func\Basis
+directory = C:\TiaWorkspace\TopCtrl_V3_Eng\PLC_LIB\Blocks\TopCtrl_Func\Basis
 path      = ["TopCtrl_Func", "Basis"]
 ```
 
-`tia_plc_blocks_get_file` → `…\Basis\tbDTLtoString.s7dcl`  
-`tia_plc_blocks_get_dir` on `…\PLC_LIB\TopCtrl_Func\Visu` with `path=["TopCtrl_Func","Visu"]` → root files plus `Panel\`, `Panel_Comfort\`, `Panel_Unified\`.
+`tia_plc_blocks_get_file` → `…\Blocks\TopCtrl_Func\Basis\tbDTLtoString.s7dcl`  
+`tia_plc_blocks_get_dir` on `…\PLC_LIB\Blocks\TopCtrl_Func\Visu` with `path=["TopCtrl_Func","Visu"]` → root files plus `Panel\`, `Panel_Comfort\`, `Panel_Unified\`.  
+Whole-PLC export: `directory` = `…\PLC_LIB\Blocks` / `…\UDTs` / `…\TagTables` (omit `path`).
 
 ## Compile
 

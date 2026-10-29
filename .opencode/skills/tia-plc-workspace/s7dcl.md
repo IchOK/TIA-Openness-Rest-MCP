@@ -25,7 +25,7 @@ If `BlockName` on the message is not the block you imported, open/export that bl
 1. Copy a similar FC `.s7dcl` (and `.s7res` if present).
 2. Rename the function in the declaration to the new `BlockName` (must match the file stem).
 3. Keep SD headers/attributes unless you know they must change.
-4. Put the files in `directory` = `PlcDir(path)` (see SKILL.md); pass the same TIA folder array as `path`.
+4. Put the files in `directory` = `KindDir(Blocks, path)` (see SKILL.md); pass the same TIA folder array as `path`.
 5. Import with `tia_plc_blocks_put_file` (`directory` + `path`), then compile.
 
 Prefer editing exported SD over writing a block from an empty buffer. TIA is strict about SD structure.
